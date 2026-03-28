@@ -607,13 +607,16 @@
         <span id="emergingYearBadge" style="color:#f0ede8;font-family:'DM Mono';font-size:14px;min-width:40px;">1995</span>
       </div>
 
+      <!-- Accuracy banner -->
+      <div id="emergingAccuracy" style="margin-bottom:12px;padding:10px 16px;border-radius:6px;font-family:'DM Mono';font-size:13px;"></div>
+
       <!-- Prediction table -->
       <div style="overflow-x:auto;">
         <table class="event-table" id="emergingTable">
           <thead>
             <tr>
-              <th>#</th><th>word</th><th>P(breakout)</th><th>regime</th>
-              <th>actual growth</th><th>result</th>
+              <th>#</th><th>word</th><th>breakout score</th><th>regime</th>
+              <th>5yr growth (revealed)</th><th>hit?</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -1494,11 +1497,34 @@ function onEmergingYear(year) {
 
   const preds = emergingData.predictions[String(year)];
   const tbody = document.querySelector('#emergingTable tbody');
+  const banner = document.getElementById('emergingAccuracy');
 
   if (!preds || preds.length === 0) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">no predictions for this year</td></tr>';
+    banner.innerHTML = '';
     return;
   }
+
+  // Accuracy banner
+  const hits = preds.filter(w => w.actual === 1).length;
+  const total = preds.length;
+  const pct = (100 * hits / total).toFixed(0);
+  const canVerify = parseInt(year) <= 2003;
+  if (canVerify) {
+    const barColor = hits / total >= 0.7 ? '#a8c8a0' : hits / total >= 0.5 ? '#ffb74d' : '#c87878';
+    banner.innerHTML = `<span style="color:${barColor};font-weight:700;font-size:18px;">${hits}/${total}</span>`
+      + ` <span style="color:#7a7875;">predictions correct (${pct}%) — revealed growth ${emergingData.horizon} years later (by ${parseInt(year) + emergingData.horizon})</span>`;
+    banner.style.background = 'rgba(255,255,255,0.03)';
+  } else {
+    banner.innerHTML = `<span style="color:#ffb74d;">&#9888;</span> <span style="color:#7a7875;">Unverified — data ends at 2008, cannot check ${emergingData.horizon}-year outcomes</span>`;
+    banner.style.background = 'rgba(255,183,77,0.05)';
+  }
+
+  // Normalize prob for visual bar: scale within this year's min–max
+  const probs = preds.map(w => w.prob);
+  const pMin = Math.min(...probs);
+  const pMax = Math.max(...probs);
+  const pRange = pMax - pMin || 1;
 
   const REGIME_COLORS = {
     adoption:  '#a8c8a0', decline: '#c87878',
@@ -1506,21 +1532,36 @@ function onEmergingYear(year) {
   };
 
   tbody.innerHTML = preds.map((w, i) => {
+    // Normalized bar width: 30%–100% of cell
+    const normPct = 30 + 70 * ((w.prob - pMin) / pRange);
+
     const growthStr = w.growth != null ? `${w.growth.toFixed(1)}×` : '—';
     const growthColor = w.growth != null
       ? (w.growth >= 2 ? '#a8c8a0' : w.growth >= 1 ? '#7a7875' : '#c87878')
       : '#7a7875';
-    const resultIcon = w.actual === 1 ? '&#10003;' : '&#10007;';
-    const resultColor = w.actual === 1 ? '#a8c8a0' : '#c87878';
     const regimeColor = REGIME_COLORS[w.regime] || '#7a7875';
+
+    let resultCell;
+    if (canVerify) {
+      const resultIcon = w.actual === 1 ? '&#10003;' : '&#10007;';
+      const resultColor = w.actual === 1 ? '#a8c8a0' : '#c87878';
+      resultCell = `<td style="color:${resultColor};font-size:16px;">${resultIcon}</td>`;
+    } else {
+      resultCell = `<td style="color:#7a7875;">?</td>`;
+    }
 
     return `<tr style="cursor:pointer;" onclick="jumpToWord('${w.word}')">
       <td>${i + 1}</td>
       <td style="font-weight:600;">${w.word}</td>
-      <td><span style="background:rgba(200,184,154,${w.prob * 0.7});padding:2px 8px;border-radius:4px;">${(w.prob * 100).toFixed(1)}%</span></td>
+      <td>
+        <div style="position:relative;height:20px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,0.03);">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${normPct}%;background:rgba(200,184,154,0.4);border-radius:3px;"></div>
+          <span style="position:relative;z-index:1;padding:0 6px;font-size:11px;line-height:20px;">${(w.prob * 100).toFixed(1)}%</span>
+        </div>
+      </td>
       <td><span style="color:${regimeColor};">${w.regime}</span></td>
-      <td style="color:${growthColor};font-weight:600;">${growthStr}</td>
-      <td style="color:${resultColor};font-size:16px;">${resultIcon}</td>
+      <td style="color:${growthColor};font-weight:600;">${canVerify ? growthStr : '—'}</td>
+      ${resultCell}
     </tr>`;
   }).join('');
 }
