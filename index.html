@@ -1692,7 +1692,7 @@ let shiftCharts = {};
 
 async function loadShiftDetector() {
   try {
-    const res = await fetch(`${API}/api/shift-detection`);
+    const res = await fetch(`${PROXY}/api/shift-detection`);
     shiftData = await res.json();
     shiftLoaded = true;
     renderShiftDetector();
