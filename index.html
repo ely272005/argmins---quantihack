@@ -706,6 +706,9 @@ function removeWord(word) {
   renderChips();
   renderChart();
   renderStats();
+  if (words.length === 0) {
+    document.getElementById('modelPanel').style.display = 'none';
+  }
 }
 
 function clearAll() {
@@ -714,6 +717,7 @@ function clearAll() {
   renderChart();
   renderStats();
   setStatus('');
+  document.getElementById('modelPanel').style.display = 'none';
 }
 
 function renderChips() {
@@ -923,10 +927,36 @@ function renderModelPanel(data) {
     tension: 0.3,
   };
 
+  // Changepoint lines as inline plugin (NOT Chart.register — that poisons all charts)
+  const cpYears = data.changepoints || [];
+  const cpPlugin = {
+    id: 'cpLinesInline',
+    afterDraw(chart) {
+      if (!cpYears.length) return;
+      const ctx = chart.ctx;
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      if (!xScale || !yScale) return;
+      ctx.save();
+      ctx.strokeStyle = 'rgba(200,120,120,0.6)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      cpYears.forEach(yr => {
+        const x = xScale.getPixelForValue(yr);
+        ctx.beginPath();
+        ctx.moveTo(x, yScale.top);
+        ctx.lineTo(x, yScale.bottom);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+  };
+
   const canvas = document.getElementById('modelChart');
   modelChartInstance = new Chart(canvas, {
     type: 'line',
     data: { datasets: [upperBandDataset, lowerBandDataset, levelDataset, ...regimeDatasets] },
+    plugins: [cpPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -964,34 +994,6 @@ function renderModelPanel(data) {
       }
     }
   });
-
-  // Changepoints: add annotation lines via afterDraw plugin
-  const cpYears = data.changepoints || [];
-  if (cpYears.length > 0) {
-    const plugin = {
-      id: 'cpLines',
-      afterDraw(chart) {
-        const ctx = chart.ctx;
-        const xScale = chart.scales.x;
-        const yScale = chart.scales.y;
-        ctx.save();
-        ctx.strokeStyle = 'rgba(200,120,120,0.6)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        cpYears.forEach(yr => {
-          const x = xScale.getPixelForValue(yr);
-          ctx.beginPath();
-          ctx.moveTo(x, yScale.top);
-          ctx.lineTo(x, yScale.bottom);
-          ctx.stroke();
-        });
-        ctx.restore();
-      }
-    };
-    modelChartInstance.options.plugins.cpLines = {};
-    Chart.register(plugin);
-    modelChartInstance.update();
-  }
 }
 
 // addWord is defined above; model fetch is handled inside it directly.
@@ -1062,6 +1064,28 @@ function renderLIIChart(liiData, alignData) {
 
   if (liiChartInstance) liiChartInstance.destroy();
 
+  // Event bands as inline plugin (NOT Chart.register — that poisons all charts)
+  const evtPlugin = {
+    id: 'eventBandsInline',
+    beforeDraw(chart) {
+      const ctx = chart.ctx;
+      const xScale = chart.scales.x;
+      const yLii = chart.scales.yLii;
+      if (!xScale || !yLii) return;
+      ctx.save();
+      alignData.forEach(ev => {
+        const x1 = xScale.getPixelForValue(ev.start_year);
+        const x2 = xScale.getPixelForValue(ev.end_year);
+        const color = CAT_COLORS[ev.category] || '#9E9E9E';
+        ctx.fillStyle = ev.aligned
+          ? color.replace(')', ',0.08)').replace('rgb', 'rgba')
+          : 'rgba(100,100,100,0.05)';
+        ctx.fillRect(x1, yLii.top, x2 - x1, yLii.bottom - yLii.top);
+      });
+      ctx.restore();
+    }
+  };
+
   const canvas = document.getElementById('liiChart');
   liiChartInstance = new Chart(canvas, {
     type: 'line',
@@ -1092,6 +1116,7 @@ function renderLIIChart(liiData, alignData) {
         }
       ]
     },
+    plugins: [evtPlugin],
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -1142,29 +1167,6 @@ function renderLIIChart(liiData, alignData) {
       }
     }
   });
-
-  // Overlay event bands using afterDraw plugin
-  const evtPlugin = {
-    id: 'eventBands',
-    beforeDraw(chart) {
-      const ctx = chart.ctx;
-      const xScale = chart.scales.x;
-      const yLii = chart.scales.yLii;
-      ctx.save();
-      alignData.forEach(ev => {
-        const x1 = xScale.getPixelForValue(ev.start_year);
-        const x2 = xScale.getPixelForValue(ev.end_year);
-        const color = CAT_COLORS[ev.category] || '#9E9E9E';
-        ctx.fillStyle = ev.aligned
-          ? color.replace(')', ',0.08)').replace('rgb', 'rgba')
-          : 'rgba(100,100,100,0.05)';
-        ctx.fillRect(x1, yLii.top, x2 - x1, yLii.bottom - yLii.top);
-      });
-      ctx.restore();
-    }
-  };
-  Chart.register(evtPlugin);
-  liiChartInstance.update();
 }
 
 function renderEventTable(alignData) {
@@ -1235,7 +1237,7 @@ function renderFactorChart(n) {
       datasets: [{
         label: `Factor ${n}`,
         data: vals,
-        borderColor: 'var(--accent2)',
+        borderColor: '#8fa8c8',
         borderWidth: 1.5,
         pointRadius: 0,
         tension: 0.3,
