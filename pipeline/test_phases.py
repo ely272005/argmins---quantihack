@@ -30,6 +30,13 @@ LII_INDEX            = "data/processed/language_instability_index.parquet"
 HISTORICAL_EVENTS_JSON = "data/processed/historical_events.json"
 EVENT_ALIGNMENT_JSON   = "data/processed/event_alignment.json"
 
+OUTPUTS_LII_JSON     = "outputs/lii.json"
+OUTPUTS_DENSITY_JSON = "outputs/changepoint_density.json"
+OUTPUTS_FACTORS_JSON = "outputs/factor_trajectories.json"
+OUTPUTS_EVENTS_JSON  = "outputs/events.json"
+OUTPUTS_WORD_INDEX   = "outputs/word_index.json"
+OUTPUTS_WORDS_DIR    = "outputs/words"
+
 YEAR_MIN = 1800
 YEAR_MAX = 2008
 MIN_YEARS_PRESENT = 20
@@ -1263,4 +1270,168 @@ class TestPhase9Events:
         assert n_aligned >= 6, (
             f"Only {n_aligned}/{n_total} events aligned — expected ≥ 6. "
             "Check baseline computation or elevation ratio logic."
+        )
+
+
+# ── Phase 10: Frontend-Ready Export ───────────────────────────
+class TestPhase10Export:
+    """15 tests verifying outputs/ JSON files produced by 10_export.py."""
+
+    # ── Fixtures ──────────────────────────────────────────────
+
+    @pytest.fixture(scope="class")
+    def lii_json(self):
+        import json
+        with open(OUTPUTS_LII_JSON) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def density_json(self):
+        import json
+        with open(OUTPUTS_DENSITY_JSON) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def factors_json(self):
+        import json
+        with open(OUTPUTS_FACTORS_JSON) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def events_json(self):
+        import json
+        with open(OUTPUTS_EVENTS_JSON) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def word_index(self):
+        import json
+        with open(OUTPUTS_WORD_INDEX) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def war_word(self):
+        import json
+        fpath = os.path.join(OUTPUTS_WORDS_DIR, "war.json")
+        with open(fpath) as f:
+            return json.load(f)
+
+    # ── a. System-level JSON files (7 tests) ──────────────────
+
+    def test_system_files_exist(self):
+        """All 5 core output JSON files must exist."""
+        for fpath in [OUTPUTS_LII_JSON, OUTPUTS_DENSITY_JSON, OUTPUTS_FACTORS_JSON,
+                      OUTPUTS_EVENTS_JSON, OUTPUTS_WORD_INDEX]:
+            assert os.path.exists(fpath), f"Missing output file: {fpath}"
+
+    def test_lii_json_row_count(self, lii_json):
+        """lii.json must have exactly 209 rows (years 1800–2008 inclusive)."""
+        assert len(lii_json) == 209, (
+            f"lii.json has {len(lii_json)} rows — expected 209 (1800–2008)"
+        )
+
+    def test_lii_json_schema(self, lii_json):
+        """Every entry in lii.json must have keys: year, lii, cr, bvn, fallback."""
+        required = {"year", "lii", "cr", "bvn", "fallback"}
+        for row in lii_json:
+            missing = required - set(row.keys())
+            assert not missing, f"lii.json row missing keys {missing}: {row}"
+
+    def test_lii_null_pattern(self, lii_json):
+        """Years 1800–1804 must have lii=null (not enough history for rolling window)."""
+        early = [r for r in lii_json if r["year"] <= 1804]
+        assert len(early) == 5, f"Expected 5 early rows, got {len(early)}"
+        for row in early:
+            assert row["lii"] is None, (
+                f"Year {row['year']}: lii={row['lii']!r} — expected null"
+            )
+
+    def test_density_json_row_count(self, density_json):
+        """changepoint_density.json must have exactly 209 rows."""
+        assert len(density_json) == 209, (
+            f"density.json has {len(density_json)} rows — expected 209"
+        )
+
+    def test_factor_traj_json_schema(self, factors_json):
+        """Every entry in factor_trajectories.json must have year + f1..f10."""
+        required = {"year"} | {f"f{i}" for i in range(1, 11)}
+        for row in factors_json:
+            missing = required - set(row.keys())
+            assert not missing, f"factor_trajectories.json row missing keys {missing}"
+
+    def test_events_json_consistent(self, events_json):
+        """outputs/events.json must contain the same 12 event names as the source file."""
+        import json
+        with open(HISTORICAL_EVENTS_JSON) as f:
+            source = json.load(f)
+        src_names = {e["name"] for e in source}
+        out_names = {e["name"] for e in events_json}
+        assert src_names == out_names, (
+            f"Event name mismatch.\n  Source only: {src_names - out_names}\n"
+            f"  Output only: {out_names - src_names}"
+        )
+
+    # ── b. Word index (4 tests) ────────────────────────────────
+
+    def test_word_index_exists(self, word_index):
+        """outputs/word_index.json must exist and be a dict."""
+        assert isinstance(word_index, dict), (
+            f"word_index.json is type {type(word_index).__name__} — expected dict"
+        )
+
+    def test_word_index_min_coverage(self, word_index):
+        """Word index must contain at least 50,000 entries."""
+        assert len(word_index) >= 50_000, (
+            f"word_index has {len(word_index)} entries — expected ≥ 50,000"
+        )
+
+    def test_word_index_schema(self, word_index):
+        """Entry for 'war' must have keys: peak, drift, regime, ncp."""
+        assert "war" in word_index, "'war' not found in word_index"
+        entry = word_index["war"]
+        required = {"peak", "drift", "regime", "ncp"}
+        missing = required - set(entry.keys())
+        assert not missing, f"word_index['war'] missing keys {missing}: {entry}"
+
+    def test_word_index_regime_valid(self, word_index):
+        """'war' regime must be one of the four valid labels."""
+        valid = {"adoption", "decline", "turbulent", "stable"}
+        regime = word_index["war"]["regime"]
+        assert regime in valid, (
+            f"word_index['war']['regime'] = {regime!r} — not in {valid}"
+        )
+
+    # ── c. Per-word JSON files (3 tests) ──────────────────────
+
+    def test_words_dir_has_files(self):
+        """outputs/words/ must contain at least 100 JSON files."""
+        assert os.path.isdir(OUTPUTS_WORDS_DIR), f"Missing directory: {OUTPUTS_WORDS_DIR}"
+        files = [f for f in os.listdir(OUTPUTS_WORDS_DIR) if f.endswith(".json")]
+        assert len(files) >= 100, (
+            f"outputs/words/ has {len(files)} JSON files — expected ≥ 100"
+        )
+
+    def test_war_word_file_schema(self, war_word):
+        """outputs/words/war.json must have all required top-level keys."""
+        required = {"word", "years", "level", "drift", "instab", "regime",
+                    "changepoints", "summary"}
+        missing = required - set(war_word.keys())
+        assert not missing, f"war.json missing keys {missing}"
+
+    def test_war_word_year_coverage(self, war_word):
+        """war.json 'years' array must have 209 entries (1800–2008)."""
+        n = len(war_word["years"])
+        assert n == 209, f"war.json['years'] has {n} entries — expected 209"
+
+    # ── d. Data integrity (1 test) ────────────────────────────
+
+    def test_war_changepoints_match_pipeline(self, war_word):
+        """Changepoints in war.json must be a subset of changepoints.parquet for 'war'."""
+        cp_df = pl.read_parquet(CHANGEPOINTS).filter(pl.col("word") == "war")
+        pipeline_cps = set(cp_df["changepoint_year"].to_list())
+        export_cps   = set(war_word["changepoints"])
+        extra = export_cps - pipeline_cps
+        assert not extra, (
+            f"war.json has changepoints {extra} not in changepoints.parquet: "
+            f"pipeline={sorted(pipeline_cps)}"
         )

@@ -270,6 +270,131 @@
     letter-spacing: 0.03em;
   }
 
+  /* ── Tab navigation ─────────────────────────────────────── */
+  .tab-nav {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 20px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: color 0.15s, border-color 0.15s;
+    margin-bottom: -1px;
+  }
+
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-btn:hover:not(.active) { color: var(--text); }
+
+  .tab-section { display: none; }
+  .tab-section.active { display: block; }
+
+  /* ── Model data panel (word enrichment) ─────────────────── */
+  .model-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .model-panel-title {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  /* ── LII Dashboard ──────────────────────────────────────── */
+  .dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1.5rem;
+  }
+
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 14px;
+  }
+
+  .dash-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .dash-value {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text);
+    font-family: var(--font-display);
+  }
+
+  .dash-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-bottom: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  /* ── Event table ────────────────────────────────────────── */
+  .event-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-top: 1rem;
+  }
+
+  .event-table th {
+    color: var(--text);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-size: 10px;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border2);
+    text-align: left;
+    font-weight: 400;
+  }
+
+  .event-table td {
+    padding: 5px 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .aligned-yes { color: var(--accent3); font-weight: 500; }
+  .aligned-no  { color: var(--danger); opacity: 0.6; }
+
+  .cat-conflict   { color: #E57373; }
+  .cat-health     { color: #81C784; }
+  .cat-political  { color: #64B5F6; }
+  .cat-economic   { color: #FFB74D; }
+  .cat-technology { color: #CE93D8; }
+
 </style>
 </head>
 <body>
@@ -282,6 +407,15 @@
 </header>
 
 <main>
+
+  <!-- Tab navigation -->
+  <nav class="tab-nav">
+    <button class="tab-btn active" id="tab-explorer" onclick="showTab('explorer')">word explorer</button>
+    <button class="tab-btn" id="tab-dashboard" onclick="showTab('dashboard')">instability dashboard</button>
+  </nav>
+
+  <!-- ── Word Explorer section ───────────────────────── -->
+  <div class="tab-section active" id="section-explorer">
 
   <div class="search-row">
     <input class="word-input" id="wordInput" type="text" placeholder="type a word..." maxlength="60" />
@@ -314,13 +448,72 @@
 
   <div class="stats-row" id="statsRow"></div>
 
+  <!-- Model data panel: shown when a word has pipeline data -->
+  <div id="modelPanel" style="display:none;">
+    <div class="model-panel">
+      <div class="model-panel-title">latent model — <span id="modelWord"></span></div>
+      <canvas id="modelChart" height="120"></canvas>
+    </div>
+  </div>
+
   <div class="note">
     data: google books ngrams corpus (english, 1800&ndash;2019) &mdash; values are relative frequency &mdash; proxy hosted on render.com
   </div>
 
+  </div><!-- end section-explorer -->
+
+  <!-- ── Instability Dashboard section ──────────────── -->
+  <div class="tab-section" id="section-dashboard">
+
+    <div id="dashLoading" style="font-size:11px;color:var(--muted);">
+      <span class="loading-dot">●</span> loading instability data…
+    </div>
+
+    <div id="dashContent" style="display:none;">
+
+      <div class="section-title">Language Instability Index <em style="font-style:italic;color:var(--accent);">1800–2008</em></div>
+
+      <div class="dashboard-grid" id="dashStats"></div>
+
+      <div class="chart-wrap" style="margin-bottom:1.5rem;">
+        <canvas id="liiChart"></canvas>
+      </div>
+
+      <div class="section-title" style="margin-top:2rem;">Historical Event Alignment</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:1rem;">
+        Elevation ratio: mean LII during event ÷ mean LII in 20-year pre-event window.
+        Aligned = ratio &gt; 1 for LII or changepoint density.
+      </p>
+      <table class="event-table">
+        <thead>
+          <tr>
+            <th>Event</th>
+            <th>Period</th>
+            <th>Category</th>
+            <th>LII ratio</th>
+            <th>CP ratio</th>
+            <th>Aligned</th>
+          </tr>
+        </thead>
+        <tbody id="eventTableBody"></tbody>
+      </table>
+
+    </div>
+  </div><!-- end section-dashboard -->
+
 </main>
 
 <script>
+// ── Tab navigation ─────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + name).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'dashboard' && !dashLoaded) loadDashboard();
+}
+
+// ── Main constants ─────────────────────────────────────────────
 const COLORS = [
   { line: '#c8b89a', bg: 'rgba(200,184,154,0.08)' },
   { line: '#8fa8c8', bg: 'rgba(143,168,200,0.08)' },
@@ -569,6 +762,326 @@ function renderStats() {
       <div class="stat-value">${document.getElementById('yearStart').value}–${document.getElementById('yearEnd').value}</div>
     </div>
   `;
+}
+
+// ── Model data panel (word enrichment) ────────────────────────
+let modelChartInstance = null;
+
+async function fetchModelData(word) {
+  try {
+    const res = await fetch(`${PROXY}/api/word/${encodeURIComponent(word)}`);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch { return null; }
+}
+
+function renderModelPanel(data) {
+  if (!data) return;
+  const panel = document.getElementById('modelPanel');
+  document.getElementById('modelWord').textContent = data.word;
+  panel.style.display = 'block';
+
+  const REGIME_COLOR = {
+    adoption:  'rgba(168,200,160,0.7)',
+    decline:   'rgba(200,120,120,0.7)',
+    turbulent: 'rgba(255,183,77,0.7)',
+    stable:    'rgba(122,120,117,0.3)',
+  };
+
+  const valid = data.years.map((y, i) => ({ y, v: data.level[i] })).filter(d => d.v != null);
+  const instabValid = data.years.map((y, i) => ({ y, v: data.instab[i] })).filter(d => d.v != null);
+
+  if (modelChartInstance) { modelChartInstance.destroy(); modelChartInstance = null; }
+
+  const regimeDatasets = ['adoption','decline','turbulent','stable'].map(r => ({
+    label: r,
+    data: data.years.map((y, i) => data.regime[i] === r ? { x: y, y: data.level[i] } : { x: y, y: null }),
+    borderColor: REGIME_COLOR[r],
+    backgroundColor: REGIME_COLOR[r].replace('0.7', '0.15').replace('0.3', '0.08'),
+    borderWidth: 2,
+    pointRadius: 0,
+    fill: false,
+    tension: 0.3,
+    spanGaps: false,
+  }));
+
+  const levelDataset = {
+    label: 'latent level',
+    data: valid.map(d => ({ x: d.y, y: d.v })),
+    borderColor: 'rgba(200,184,154,0.4)',
+    backgroundColor: 'rgba(200,184,154,0.04)',
+    borderWidth: 1,
+    pointRadius: 0,
+    fill: true,
+    tension: 0.3,
+  };
+
+  const canvas = document.getElementById('modelChart');
+  modelChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: { datasets: [levelDataset, ...regimeDatasets] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 4,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e21',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#f0ede8',
+          bodyColor: '#7a7875',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 10 },
+          callbacks: {
+            title: items => `${items[0].parsed.x}`,
+            label: item => item.parsed.y != null ? ` ${item.dataset.label}: ${item.parsed.y.toFixed(4)}` : null,
+            filter: item => item.parsed.y != null,
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 10, callback: v => Math.round(v) },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 }, maxTicksLimit: 4, callback: v => v.toFixed(2) },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        }
+      }
+    }
+  });
+
+  // Changepoints: add annotation lines via afterDraw plugin
+  const cpYears = data.changepoints || [];
+  if (cpYears.length > 0) {
+    const plugin = {
+      id: 'cpLines',
+      afterDraw(chart) {
+        const ctx = chart.ctx;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(200,120,120,0.6)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        cpYears.forEach(yr => {
+          const x = xScale.getPixelForValue(yr);
+          ctx.beginPath();
+          ctx.moveTo(x, yScale.top);
+          ctx.lineTo(x, yScale.bottom);
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+    };
+    modelChartInstance.options.plugins.cpLines = {};
+    Chart.register(plugin);
+    modelChartInstance.update();
+  }
+}
+
+// Extend addWord to also fetch model data
+const _origAddWord = addWord;
+async function addWord() {
+  const raw = wordInput.value.trim().toLowerCase();
+  await _origAddWord();
+  // Only try model fetch if word was successfully added
+  if (words.find(w => w.word === raw)) {
+    const modelData = await fetchModelData(raw);
+    if (modelData) renderModelPanel(modelData);
+  }
+}
+
+// ── LII Dashboard ──────────────────────────────────────────────
+let dashLoaded = false;
+let liiChartInstance = null;
+
+const CAT_COLORS = {
+  conflict: '#E57373', health: '#81C784', political: '#64B5F6',
+  economic: '#FFB74D', technology: '#CE93D8',
+};
+
+async function loadDashboard() {
+  dashLoaded = true;
+  try {
+    const [liiData, alignData] = await Promise.all([
+      fetch(`${PROXY}/api/lii`).then(r => r.json()),
+      fetch(`${PROXY}/api/event-alignment`).then(r => r.json()),
+    ]);
+    renderDashStats(liiData, alignData);
+    renderLIIChart(liiData, alignData);
+    renderEventTable(alignData);
+    document.getElementById('dashLoading').style.display = 'none';
+    document.getElementById('dashContent').style.display = 'block';
+  } catch (e) {
+    document.getElementById('dashLoading').textContent = 'failed to load dashboard data';
+  }
+}
+
+function renderDashStats(liiData, alignData) {
+  const valid = liiData.filter(d => d.lii != null);
+  const maxRow = valid.reduce((a, b) => b.lii > a.lii ? b : a);
+  const lastRow = valid[valid.length - 1];
+  const nAligned = alignData.filter(e => e.aligned).length;
+  const topEvent = alignData.filter(e => e.lii_elevation_ratio != null)
+    .reduce((a, b) => b.lii_elevation_ratio > a.lii_elevation_ratio ? b : a);
+
+  document.getElementById('dashStats').innerHTML = `
+    <div class="dash-card">
+      <div class="dash-label">LII peak year</div>
+      <div class="dash-value">${maxRow.year}</div>
+      <div class="dash-sub">lii = ${maxRow.lii.toFixed(1)}</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">most recent LII</div>
+      <div class="dash-value">${lastRow.lii.toFixed(1)}</div>
+      <div class="dash-sub">${lastRow.year}</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">events aligned</div>
+      <div class="dash-value">${nAligned} / ${alignData.length}</div>
+      <div class="dash-sub">LII or CP elevated</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">top aligned event</div>
+      <div class="dash-value" style="font-size:16px;">${topEvent.name}</div>
+      <div class="dash-sub">ratio ${topEvent.lii_elevation_ratio.toFixed(2)}×</div>
+    </div>
+  `;
+}
+
+function renderLIIChart(liiData, alignData) {
+  const valid = liiData.filter(d => d.lii != null);
+  const years = valid.map(d => d.year);
+  const liiVals = valid.map(d => d.lii);
+  const crVals = valid.map(d => d.cr);
+
+  if (liiChartInstance) liiChartInstance.destroy();
+
+  const canvas = document.getElementById('liiChart');
+  liiChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'LII  [tr(Σ_t)]',
+          data: years.map((y, i) => ({ x: y, y: liiVals[i] })),
+          borderColor: '#c8b89a',
+          backgroundColor: 'rgba(200,184,154,0.07)',
+          borderWidth: 1.8,
+          pointRadius: 0,
+          fill: true,
+          tension: 0.3,
+          yAxisID: 'yLii',
+        },
+        {
+          label: 'Concentration Ratio',
+          data: years.map((y, i) => ({ x: y, y: crVals[i] })),
+          borderColor: '#8fa8c8',
+          backgroundColor: 'transparent',
+          borderWidth: 1.2,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.3,
+          borderDash: [4, 3],
+          yAxisID: 'yCr',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      aspectRatio: 2.5,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#7a7875', font: { family: 'DM Mono', size: 11 }, boxWidth: 20 }
+        },
+        tooltip: {
+          backgroundColor: '#1e1e21',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#f0ede8',
+          bodyColor: '#7a7875',
+          titleFont: { family: 'DM Mono', size: 12 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          callbacks: {
+            title: items => `${items[0].parsed.x}`,
+            label: item => ` ${item.dataset.label}: ${item.parsed.y.toFixed(item.dataset.yAxisID === 'yCr' ? 3 : 1)}`
+          }
+        }
+      },
+      scales: {
+        x: {
+          type: 'linear',
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 11 }, maxTicksLimit: 12, callback: v => Math.round(v) },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        },
+        yLii: {
+          type: 'linear', position: 'left',
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 6, callback: v => v.toFixed(0) },
+          border: { color: 'rgba(255,255,255,0.07)' },
+          title: { display: true, text: 'LII', color: '#7a7875', font: { family: 'DM Mono', size: 10 } }
+        },
+        yCr: {
+          type: 'linear', position: 'right',
+          grid: { display: false },
+          ticks: { color: '#8fa8c8', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 5, callback: v => v.toFixed(2) },
+          border: { color: 'rgba(255,255,255,0.07)' },
+          min: 0, max: 1,
+          title: { display: true, text: 'CR', color: '#8fa8c8', font: { family: 'DM Mono', size: 10 } }
+        }
+      }
+    }
+  });
+
+  // Overlay event bands using afterDraw plugin
+  const evtPlugin = {
+    id: 'eventBands',
+    beforeDraw(chart) {
+      const ctx = chart.ctx;
+      const xScale = chart.scales.x;
+      const yLii = chart.scales.yLii;
+      ctx.save();
+      alignData.forEach(ev => {
+        const x1 = xScale.getPixelForValue(ev.start_year);
+        const x2 = xScale.getPixelForValue(ev.end_year);
+        const color = CAT_COLORS[ev.category] || '#9E9E9E';
+        ctx.fillStyle = ev.aligned
+          ? color.replace(')', ',0.08)').replace('rgb', 'rgba')
+          : 'rgba(100,100,100,0.05)';
+        ctx.fillRect(x1, yLii.top, x2 - x1, yLii.bottom - yLii.top);
+      });
+      ctx.restore();
+    }
+  };
+  Chart.register(evtPlugin);
+  liiChartInstance.update();
+}
+
+function renderEventTable(alignData) {
+  const tbody = document.getElementById('eventTableBody');
+  tbody.innerHTML = alignData.map(ev => `
+    <tr>
+      <td style="color:var(--text)">${ev.name}</td>
+      <td>${ev.start_year}–${ev.end_year}</td>
+      <td class="cat-${ev.category}">${ev.category}</td>
+      <td>${ev.lii_elevation_ratio != null ? ev.lii_elevation_ratio.toFixed(2) + '×' : '—'}</td>
+      <td>${ev.cp_elevation_ratio  != null ? ev.cp_elevation_ratio.toFixed(2)  + '×' : '—'}</td>
+      <td class="${ev.aligned ? 'aligned-yes' : 'aligned-no'}">${ev.aligned ? '✓ yes' : '✗ no'}</td>
+    </tr>
+  `).join('');
 }
 </script>
 </body>

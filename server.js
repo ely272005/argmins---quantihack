@@ -1,9 +1,41 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 app.use(cors());
 
+// ── Static outputs directory ───────────────────────────────────
+app.use('/outputs', express.static(path.join(__dirname, 'outputs')));
+
+// ── Pipeline data endpoints ────────────────────────────────────
+// In-memory cache so each file is read from disk only once.
+const fileCache = new Map();
+function loadJSON(filename) {
+  if (fileCache.has(filename)) return fileCache.get(filename);
+  const fpath = path.join(__dirname, 'outputs', filename);
+  if (!fs.existsSync(fpath)) return null;
+  const data = JSON.parse(fs.readFileSync(fpath, 'utf8'));
+  fileCache.set(filename, data);
+  return data;
+}
+
+app.get('/api/lii',             (_, res) => { const d = loadJSON('lii.json');                    d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/density',         (_, res) => { const d = loadJSON('changepoint_density.json');    d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/factors',         (_, res) => { const d = loadJSON('factor_trajectories.json');    d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/events',          (_, res) => { const d = loadJSON('events.json');                 d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/event-alignment', (_, res) => { const d = loadJSON('event_alignment.json');        d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/word-index',      (_, res) => { const d = loadJSON('word_index.json');             d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+
+app.get('/api/word/:word', (req, res) => {
+  const word = req.params.word.toLowerCase().replace(/[^a-z]/g, '');
+  const fpath = path.join(__dirname, 'outputs', 'words', `${word}.json`);
+  if (!fs.existsSync(fpath)) return res.status(404).json({ error: 'no model data for this word' });
+  res.json(JSON.parse(fs.readFileSync(fpath, 'utf8')));
+});
+
+// ── Ngrams proxy (existing) ────────────────────────────────────
 const cache = new Map();
 
 app.get('/ngrams', async (req, res) => {
