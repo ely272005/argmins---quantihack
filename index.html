@@ -205,7 +205,7 @@
     color: var(--border2);
   }
 
-  canvas { display: block; width: 100% !important; }
+  canvas { display: block; }
 
   .stats-row {
     display: grid;
@@ -1036,11 +1036,11 @@ function renderDashStats(liiData, alignData) {
     <div class="dash-card">
       <div class="dash-label">LII peak year</div>
       <div class="dash-value">${maxRow.year}</div>
-      <div class="dash-sub">lii = ${maxRow.lii.toFixed(1)}</div>
+      <div class="dash-sub">lii = ${maxRow.lii.toFixed(4)}</div>
     </div>
     <div class="dash-card">
       <div class="dash-label">most recent LII</div>
-      <div class="dash-value">${lastRow.lii.toFixed(1)}</div>
+      <div class="dash-value">${lastRow.lii.toFixed(4)}</div>
       <div class="dash-sub">${lastRow.year}</div>
     </div>
     <div class="dash-card">
