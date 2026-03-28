@@ -390,3 +390,134 @@ class TestPhase4WordSummary:
         n_dynamic = word_summary.filter(pl.col("sigma2_drift") > 1e-6).shape[0]
         assert n_stable  > 1000, "Too few stable words (sigma2_drift < 1e-6)"
         assert n_dynamic > 1000, "Too few dynamic words (sigma2_drift > 1e-6)"
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 5 — changepoints.parquet + changepoint_density.parquet
+# ══════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="session")
+def changepoints():
+    return pl.read_parquet("data/processed/changepoints.parquet")
+
+@pytest.fixture(scope="session")
+def density():
+    return pl.read_parquet("data/processed/changepoint_density.parquet")
+
+
+class TestPhase5Changepoints:
+
+    def test_file_exists(self):
+        assert os.path.isfile("data/processed/changepoints.parquet")
+
+    def test_schema(self, changepoints):
+        expected = {"word", "changepoint_year", "signal", "penalty"}
+        assert set(changepoints.columns) == expected
+
+    def test_no_nulls(self, changepoints):
+        nulls = changepoints.null_count().row(0)
+        assert all(n == 0 for n in nulls), \
+            f"Nulls found: {dict(zip(changepoints.columns, nulls))}"
+
+    def test_changepoint_years_in_range(self, changepoints):
+        assert changepoints["changepoint_year"].min() >= YEAR_MIN
+        assert changepoints["changepoint_year"].max() <= YEAR_MAX
+
+    def test_signal_column_value(self, changepoints):
+        vals = changepoints["signal"].unique().to_list()
+        assert vals == ["latent_level"], f"Unexpected signal values: {vals}"
+
+    def test_not_empty(self, changepoints):
+        assert len(changepoints) > 0, "changepoints table is empty"
+
+    def test_war_has_changepoints(self, changepoints):
+        war_cps = changepoints.filter(pl.col("word") == "war")
+        assert len(war_cps) >= 1, "'war' has no detected changepoints"
+
+    def test_computer_has_changepoints(self, changepoints):
+        comp_cps = changepoints.filter(pl.col("word") == "computer")
+        assert len(comp_cps) >= 1, "'computer' has no detected changepoints"
+
+    def test_war_captures_wwi_or_wwii(self, changepoints):
+        # war must have a changepoint in the 1910–1950 window
+        war_cps = changepoints.filter(
+            (pl.col("word") == "war") &
+            (pl.col("changepoint_year") >= 1910) &
+            (pl.col("changepoint_year") <= 1950)
+        )
+        assert len(war_cps) >= 1, \
+            "No changepoint for 'war' in WWI/WWII window (1910-1950)"
+
+    def test_no_duplicate_word_year(self, changepoints):
+        dupes = changepoints.group_by(["word", "changepoint_year"]).agg(
+            pl.len().alias("n")
+        ).filter(pl.col("n") > 1)
+        assert len(dupes) == 0, \
+            f"{len(dupes)} duplicate (word, changepoint_year) pairs found"
+
+    def test_words_in_vocabulary(self, clean, changepoints):
+        cp_words  = set(changepoints["word"].unique().to_list())
+        vocab     = set(clean["word"].unique().to_list())
+        extra = cp_words - vocab
+        assert len(extra) == 0, \
+            f"Words in changepoints not in vocabulary: {list(extra)[:5]}"
+
+    def test_penalty_column_consistent(self, changepoints):
+        # All rows should have the same penalty value (one run = one penalty)
+        n_unique_penalties = changepoints["penalty"].n_unique()
+        assert n_unique_penalties == 1, \
+            f"Expected 1 unique penalty, found {n_unique_penalties}"
+
+
+class TestPhase5Density:
+
+    def test_file_exists(self):
+        assert os.path.isfile("data/processed/changepoint_density.parquet")
+
+    def test_schema(self, density):
+        expected = {"year", "n_changepoints", "normalized_density"}
+        assert set(density.columns) == expected
+
+    def test_exactly_209_rows(self, density):
+        assert len(density) == 209, \
+            f"Expected 209 rows (1800-2008), got {len(density)}"
+
+    def test_no_nulls(self, density):
+        nulls = density.null_count().row(0)
+        assert all(n == 0 for n in nulls), \
+            f"Nulls found: {dict(zip(density.columns, nulls))}"
+
+    def test_year_range(self, density):
+        assert density["year"].min() == YEAR_MIN
+        assert density["year"].max() == YEAR_MAX
+
+    def test_n_changepoints_non_negative(self, density):
+        assert density["n_changepoints"].min() >= 0
+
+    def test_normalized_density_in_range(self, density):
+        assert density["normalized_density"].min() >= 0.0
+        assert density["normalized_density"].max() <= 1.0
+
+    def test_density_sums_to_total_changepoints(self, changepoints, density):
+        total_from_density     = density["n_changepoints"].sum()
+        total_from_changepoints = len(changepoints)
+        assert total_from_density == total_from_changepoints, (
+            f"Density sum ({total_from_density}) != "
+            f"changepoints table length ({total_from_changepoints})"
+        )
+
+    def test_peak_year_not_at_boundary(self, density):
+        peak_year = density.sort("n_changepoints", descending=True)["year"][0]
+        assert peak_year not in (YEAR_MIN, YEAR_MAX), \
+            f"Peak changepoint density is at boundary year {peak_year}"
+
+    def test_historical_years_above_median(self, density):
+        # WWI onset (1914) and WWII onset (1939) should be above the median.
+        # PELT detects regime changes at conflict onset, not necessarily at end.
+        median_density = density["n_changepoints"].median()
+        for yr in [1914, 1939]:
+            row = density.filter(pl.col("year") == yr)
+            assert len(row) == 1
+            val = row["n_changepoints"][0]
+            assert val > median_density, \
+                f"Year {yr} has n_changepoints={val} <= median={median_density}"
