@@ -27,6 +27,8 @@ FACTOR_TRAJECTORIES  = "data/processed/factor_trajectories.parquet"
 FACTOR_LOADINGS      = "data/processed/factor_loadings.parquet"
 FACTOR_METADATA_JSON = "data/processed/factor_metadata.json"
 LII_INDEX            = "data/processed/language_instability_index.parquet"
+HISTORICAL_EVENTS_JSON = "data/processed/historical_events.json"
+EVENT_ALIGNMENT_JSON   = "data/processed/event_alignment.json"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -1076,4 +1078,189 @@ class TestPhase8LII:
         )
         assert modern > pre_war * 5, (
             f"Late modern LII mean ({modern:.3f}) is not >> pre-war mean ({pre_war:.3f})"
+        )
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 9 — historical_events.json + event_alignment.json
+# ══════════════════════════════════════════════════════════════
+
+class TestPhase9Events:
+    """15 tests for Phase 9 event annotation and historical alignment outputs.
+
+    Event catalog: 12 hard-coded events spanning 1800–2008.
+    Alignment: per-event LII and CP density elevation ratios vs local pre-event
+    baseline (20-year window before event; fallback 1805–1824 for early events).
+    """
+
+    VALID_CATEGORIES     = {"conflict", "health", "political", "economic", "technology"}
+    REQUIRED_EVENT_NAMES = {"WWI", "WWII", "Computing Revolution"}
+    ALIGNMENT_SCHEMA     = {
+        "name", "start_year", "end_year", "category",
+        "lii_mean_during", "lii_mean_baseline", "lii_elevation_ratio",
+        "cp_density_mean_during", "cp_density_mean_baseline", "cp_elevation_ratio",
+        "top_adoption_words", "top_decline_words",
+        "dominant_factor", "is_lii_elevated", "is_cp_elevated", "aligned",
+    }
+
+    @pytest.fixture(scope="class")
+    def events(self):
+        import json
+        with open(HISTORICAL_EVENTS_JSON) as f:
+            return json.load(f)
+
+    @pytest.fixture(scope="class")
+    def alignment(self):
+        import json
+        with open(EVENT_ALIGNMENT_JSON) as f:
+            return json.load(f)
+
+    # ── (a) Structural ─────────────────────────────────────────
+
+    def test_files_exist(self):
+        assert os.path.isfile(HISTORICAL_EVENTS_JSON), f"Missing: {HISTORICAL_EVENTS_JSON}"
+        assert os.path.isfile(EVENT_ALIGNMENT_JSON),   f"Missing: {EVENT_ALIGNMENT_JSON}"
+
+    def test_events_is_list_of_dicts(self, events):
+        assert isinstance(events, list), "historical_events.json must be a list"
+        assert len(events) > 0, "historical_events.json is empty"
+        required_keys = {"name", "start_year", "end_year", "category"}
+        for ev in events:
+            assert isinstance(ev, dict), f"Non-dict entry: {ev}"
+            missing = required_keys - ev.keys()
+            assert not missing, f"Event missing required keys {missing}: {ev}"
+
+    def test_alignment_schema(self, alignment):
+        assert isinstance(alignment, list), "event_alignment.json must be a list"
+        assert len(alignment) > 0, "event_alignment.json is empty"
+        for rec in alignment:
+            missing = self.ALIGNMENT_SCHEMA - rec.keys()
+            assert not missing, (
+                f"Alignment record for '{rec.get('name', '?')}' missing keys: {missing}"
+            )
+
+    # ── (b) Events catalog ─────────────────────────────────────
+
+    def test_event_year_range_valid(self, events):
+        for ev in events:
+            assert 1800 <= ev["start_year"] <= 2008, (
+                f"Event '{ev['name']}': start_year={ev['start_year']} out of [1800, 2008]"
+            )
+            assert 1800 <= ev["end_year"] <= 2008, (
+                f"Event '{ev['name']}': end_year={ev['end_year']} out of [1800, 2008]"
+            )
+
+    def test_event_start_before_end(self, events):
+        for ev in events:
+            assert ev["start_year"] < ev["end_year"], (
+                f"Event '{ev['name']}': start_year={ev['start_year']} >= end_year={ev['end_year']}"
+            )
+
+    def test_required_events_present(self, events):
+        names = {ev["name"] for ev in events}
+        missing = self.REQUIRED_EVENT_NAMES - names
+        assert not missing, (
+            f"Required events missing from catalog: {missing}. Found: {names}"
+        )
+
+    def test_valid_categories(self, events):
+        for ev in events:
+            assert ev["category"] in self.VALID_CATEGORIES, (
+                f"Event '{ev['name']}': invalid category '{ev['category']}'. "
+                f"Must be one of: {self.VALID_CATEGORIES}"
+            )
+
+    # ── (c) Alignment metrics validity ─────────────────────────
+
+    def test_lii_metrics_finite(self, alignment):
+        for rec in alignment:
+            for field in ("lii_mean_during", "lii_mean_baseline", "lii_elevation_ratio"):
+                val = rec[field]
+                if val is not None:
+                    assert math.isfinite(val), (
+                        f"Event '{rec['name']}': {field}={val} is not finite"
+                    )
+
+    def test_cp_metrics_finite(self, alignment):
+        for rec in alignment:
+            for field in ("cp_density_mean_during", "cp_density_mean_baseline",
+                          "cp_elevation_ratio"):
+                val = rec[field]
+                if val is not None:
+                    assert math.isfinite(val), (
+                        f"Event '{rec['name']}': {field}={val} is not finite"
+                    )
+
+    def test_top_words_nonempty_strings(self, alignment):
+        for rec in alignment:
+            for field in ("top_adoption_words", "top_decline_words"):
+                words = rec[field]
+                assert isinstance(words, list), (
+                    f"Event '{rec['name']}': {field} must be list, got {type(words)}"
+                )
+                assert len(words) > 0, (
+                    f"Event '{rec['name']}': {field} is empty"
+                )
+                for w in words:
+                    assert isinstance(w, str), (
+                        f"Event '{rec['name']}': {field} contains non-string: {w!r}"
+                    )
+
+    def test_dominant_factor_in_range(self, alignment):
+        for rec in alignment:
+            df = rec["dominant_factor"]
+            assert isinstance(df, int), (
+                f"Event '{rec['name']}': dominant_factor must be int, got {type(df)}"
+            )
+            assert 1 <= df <= 10, (
+                f"Event '{rec['name']}': dominant_factor={df} not in {{1..10}}"
+            )
+
+    # ── (d) Historical / domain sanity ─────────────────────────
+
+    def test_wwi_lii_elevated(self, alignment):
+        """WWI LII elevation vs pre-war baseline (1894–1913) must exceed 1.0.
+
+        War era mean ≈ 10.4 >> Victorian pre-war mean ≈ 4–6."""
+        wwi = next((r for r in alignment if r["name"] == "WWI"), None)
+        assert wwi is not None, "WWI record not found in alignment"
+        ratio = wwi["lii_elevation_ratio"]
+        assert ratio is not None, "WWI lii_elevation_ratio is None"
+        assert ratio > 1.0, (
+            f"WWI lii_elevation_ratio={ratio:.4f} ≤ 1.0 — "
+            "expected LII elevated vs pre-war baseline"
+        )
+
+    def test_wwii_lii_elevated(self, alignment):
+        """WWII LII elevation vs inter-war baseline (1919–1938) must exceed 1.0."""
+        wwii = next((r for r in alignment if r["name"] == "WWII"), None)
+        assert wwii is not None, "WWII record not found in alignment"
+        ratio = wwii["lii_elevation_ratio"]
+        assert ratio is not None, "WWII lii_elevation_ratio is None"
+        assert ratio > 1.0, (
+            f"WWII lii_elevation_ratio={ratio:.4f} ≤ 1.0 — "
+            "expected LII elevated vs inter-war baseline"
+        )
+
+    def test_computing_revolution_lii_exceeds_wwi(self, alignment):
+        """Computing Revolution absolute LII must far exceed WWI absolute LII.
+
+        PC-era mean LII ≈ 66.8 >> WWI mean LII ≈ 10.4.
+        Factor 1 (58.3% variance) is dominated by technology vocabulary."""
+        wwi = next((r for r in alignment if r["name"] == "WWI"), None)
+        cr  = next((r for r in alignment if r["name"] == "Computing Revolution"), None)
+        assert wwi is not None, "WWI record not found in alignment"
+        assert cr  is not None, "Computing Revolution record not found in alignment"
+        assert cr["lii_mean_during"] > wwi["lii_mean_during"], (
+            f"Computing Revolution lii_mean_during ({cr['lii_mean_during']:.2f}) "
+            f"should exceed WWI ({wwi['lii_mean_during']:.2f})"
+        )
+
+    def test_majority_events_aligned(self, alignment):
+        """At least 6 of 12 events must have aligned=True (LII or CP elevated)."""
+        n_aligned = sum(1 for r in alignment if r["aligned"])
+        n_total   = len(alignment)
+        assert n_aligned >= 6, (
+            f"Only {n_aligned}/{n_total} events aligned — expected ≥ 6. "
+            "Check baseline computation or elevation ratio logic."
         )
