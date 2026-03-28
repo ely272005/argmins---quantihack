@@ -1706,10 +1706,15 @@ function renderShiftDetector() {
 
   // ── Detection banner ─────────────────────────────────────
   const banner = document.getElementById('shiftDetectionBanner');
-  const rate = d.detection_pct;
-  const color = rate >= 90 ? '#a8c8a0' : rate >= 70 ? '#ffb74d' : '#c87878';
-  banner.innerHTML = `<span style="color:${color};font-weight:700;font-size:22px;">${d.detection_rate}</span>`
-    + ` <span style="color:#7a7875;">historical events detected (${rate}%) — purely from language patterns, no historical labels used at detection time</span>`;
+  const { n_strong, n_weak, n_missed, n_events } = d;
+  const total_detected = n_strong + n_weak;
+  banner.innerHTML = `<span style="color:#a8c8a0;font-weight:700;font-size:20px;">${n_strong}</span>`
+    + `<span style="color:#7a7875;font-size:13px;"> strong</span>`
+    + ` <span style="color:#ffb74d;font-weight:700;font-size:20px;margin-left:12px;">${n_weak}</span>`
+    + `<span style="color:#7a7875;font-size:13px;"> weak</span>`
+    + ` <span style="color:#c87878;font-weight:700;font-size:20px;margin-left:12px;">${n_missed}</span>`
+    + `<span style="color:#7a7875;font-size:13px;"> missed</span>`
+    + `<span style="color:#7a7875;font-size:13px;margin-left:16px;">out of ${n_events} historical events — detected purely from language patterns</span>`;
 
   // ── Shift type colors ────────────────────────────────────
   const TYPE_COLORS = {
@@ -1898,13 +1903,17 @@ function renderShiftDetector() {
         <th style="text-align:center;padding:6px 4px;color:#7a7875;">detected</th>
       </tr></thead>
       <tbody>${d.detections.map(det => {
-        const icon = det.detected ? '&#10003;' : '&#10007;';
-        const color = det.detected ? '#a8c8a0' : '#c87878';
+        const STRENGTH_CFG = {
+          strong: { icon: '&#9679;&#9679;&#9679;', color: '#a8c8a0', label: 'strong' },
+          weak:   { icon: '&#9679;&#9675;&#9675;', color: '#ffb74d', label: 'weak' },
+          missed: { icon: '&#10007;',              color: '#c87878', label: 'missed' },
+        };
+        const s = STRENGTH_CFG[det.strength] || STRENGTH_CFG.missed;
         return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
           <td style="padding:5px 8px;">${det.event}</td>
           <td style="text-align:center;padding:5px 4px;">${det.peak_year || '—'}</td>
           <td style="text-align:center;padding:5px 4px;">${det.peak_score.toFixed(2)}</td>
-          <td style="text-align:center;padding:5px 4px;color:${color};font-size:15px;">${icon}</td>
+          <td style="text-align:center;padding:5px 4px;color:${s.color};font-size:11px;letter-spacing:1px;" title="${s.label}">${s.icon}</td>
         </tr>`;
       }).join('')}</tbody>
     </table>`;

@@ -89,11 +89,12 @@ def main():
     # Build year→score lookup
     year_to_idx = {y: i for i, y in enumerate(years)}
 
-    # For each event, check if ShiftScore exceeds threshold during event span
-    THRESHOLD = 0.5  # z-score threshold for detection
+    # For each event, classify detection strength:
+    #   strong: peak > 1.5    weak: peak > 0.5    missed: peak ≤ 0.5
+    STRONG_THRESHOLD = 1.5
+    WEAK_THRESHOLD = 0.5
     detections = []
     for ev in events:
-        # Check scores during the event span (± 2 years)
         ev_years = range(max(ev["start_year"] - 2, min(years)),
                          min(ev["end_year"] + 3, max(years) + 1))
         scores_during = []
@@ -102,28 +103,35 @@ def main():
                 scores_during.append(shift_score_all[year_to_idx[y]])
 
         if not scores_during:
-            detections.append({"event": ev["name"], "detected": False,
-                               "peak_score": 0, "peak_year": None})
+            detections.append({"event": ev["name"], "strength": "missed",
+                               "peak_score": 0, "peak_year": None,
+                               "category": ev.get("category", "")})
             continue
 
         peak_score = max(scores_during)
         peak_idx = scores_during.index(peak_score)
         peak_year = list(ev_years)[peak_idx]
-        detected = peak_score > THRESHOLD
+
+        if peak_score > STRONG_THRESHOLD:
+            strength = "strong"
+        elif peak_score > WEAK_THRESHOLD:
+            strength = "weak"
+        else:
+            strength = "missed"
 
         detections.append({
             "event": ev["name"],
-            "detected": bool(detected),
+            "strength": strength,
             "peak_score": round(float(peak_score), 3),
             "peak_year": int(peak_year),
-            "category": ev["category"],
+            "category": ev.get("category", ""),
         })
-        tag = "DETECTED" if detected else "MISSED"
-        print(f"  {tag:8s}  {ev['name']:30s}  peak={peak_score:.2f} at {peak_year}")
+        print(f"  {strength:8s}  {ev['name']:30s}  peak={peak_score:.2f} at {peak_year}")
 
-    n_detected = sum(1 for d in detections if d["detected"])
-    detection_rate = n_detected / len(events)
-    print(f"\n  Event detection rate: {n_detected}/{len(events)} ({100*detection_rate:.0f}%)")
+    n_strong = sum(1 for d in detections if d["strength"] == "strong")
+    n_weak = sum(1 for d in detections if d["strength"] == "weak")
+    n_missed = sum(1 for d in detections if d["strength"] == "missed")
+    print(f"\n  Strong: {n_strong}  Weak: {n_weak}  Missed: {n_missed}  (out of {len(events)})")
 
     # ── Supervised model ───────────────────────────────────────
     print(f"\n[3/5] Supervised model (train ≤{TRAIN_END}) …")
@@ -201,10 +209,13 @@ def main():
                      for ev in events]
 
     output = {
-        "detection_rate": f"{n_detected}/{len(events)}",
-        "detection_pct": round(100 * detection_rate),
+        "n_strong": n_strong,
+        "n_weak": n_weak,
+        "n_missed": n_missed,
+        "n_events": len(events),
         "detections": detections,
-        "unsupervised_threshold": THRESHOLD,
+        "strong_threshold": STRONG_THRESHOLD,
+        "weak_threshold": WEAK_THRESHOLD,
         "supervised_test_auc": round(test_auc, 4),
         "feature_importances": {k: round(v, 6) for k, v in list(importances.items())[:12]},
         "timeline": timeline,
@@ -225,7 +236,7 @@ def main():
         pickle.dump(scaler, f)
 
     meta = {
-        "detection_rate": f"{n_detected}/{len(events)}",
+        "n_strong": n_strong, "n_weak": n_weak, "n_missed": n_missed,
         "detections": detections,
         "supervised_test_auc": round(test_auc, 4),
         "feature_importances": {k: round(v, 6) for k, v in importances.items()},
