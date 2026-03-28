@@ -270,43 +270,6 @@
     letter-spacing: 0.03em;
   }
 
-  .proxy-banner {
-    background: var(--surface2);
-    border: 1px solid var(--border2);
-    border-radius: 4px;
-    padding: 10px 16px;
-    margin-bottom: 1.5rem;
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .proxy-banner input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    padding: 4px 10px;
-    width: 320px;
-    outline: none;
-  }
-
-  .proxy-banner input:focus { border-color: var(--accent); }
-
-  .proxy-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--muted);
-    flex-shrink: 0;
-  }
-
-  .proxy-dot.ok { background: var(--accent3); }
-  .proxy-dot.err { background: var(--danger); }
 </style>
 </head>
 <body>
@@ -319,14 +282,6 @@
 </header>
 
 <main>
-
-  <div class="proxy-banner">
-    <div class="proxy-dot" id="proxyDot"></div>
-    <span>proxy url:</span>
-    <input id="proxyUrl" type="text" value="https://YOUR-APP.onrender.com" placeholder="https://your-app.onrender.com" />
-    <button class="add-btn" style="font-size:11px; padding:4px 12px;" onclick="checkProxy()">connect</button>
-    <span id="proxyStatus">not connected</span>
-  </div>
 
   <div class="search-row">
     <input class="word-input" id="wordInput" type="text" placeholder="type a word..." maxlength="60" />
@@ -352,7 +307,7 @@
   <div class="chart-wrap">
     <div class="chart-placeholder" id="placeholder">
       <div class="big">no words yet</div>
-      <div>connect your proxy above, then type a word</div>
+      <div>type a word above to get started</div>
     </div>
     <canvas id="myChart" style="display:none;"></canvas>
   </div>
@@ -375,40 +330,17 @@ const COLORS = [
   { line: '#d8c8a0', bg: 'rgba(216,200,160,0.08)' },
 ];
 
+const PROXY = 'https://argmins-quantihack.onrender.com';
+
 const cache = {};
 let words = [];
 let chartInstance = null;
-let proxyOk = false;
 
 const wordInput = document.getElementById('wordInput');
 const addBtn = document.getElementById('addBtn');
 const status = document.getElementById('status');
 
 wordInput.addEventListener('keydown', e => { if (e.key === 'Enter') addWord(); });
-
-function getProxy() {
-  return document.getElementById('proxyUrl').value.trim().replace(/\/$/, '');
-}
-
-async function checkProxy() {
-  const dot = document.getElementById('proxyDot');
-  const st = document.getElementById('proxyStatus');
-  dot.className = 'proxy-dot';
-  st.textContent = 'checking...';
-  try {
-    const res = await fetch(`${getProxy()}/health`);
-    const data = await res.json();
-    if (data.ok) {
-      dot.className = 'proxy-dot ok';
-      st.textContent = 'connected';
-      proxyOk = true;
-    } else throw new Error();
-  } catch {
-    dot.className = 'proxy-dot err';
-    st.textContent = 'failed — check url';
-    proxyOk = false;
-  }
-}
 
 function setStatus(msg, loading = false) {
   status.innerHTML = loading
@@ -424,7 +356,7 @@ async function fetchWord(word) {
   const key = `${w}__${ys}__${ye}`;
   if (cache[key]) return cache[key];
 
-  const url = `${getProxy()}/ngrams?content=${encodeURIComponent(w)}&year_start=${ys}&year_end=${ye}`;
+  const url = `${PROXY}/ngrams?content=${encodeURIComponent(w)}&year_start=${ys}&year_end=${ye}`;
 
   try {
     const res = await fetch(url);
@@ -442,10 +374,6 @@ async function fetchWord(word) {
 }
 
 async function addWord() {
-  if (!proxyOk) {
-    setStatus('connect your proxy first');
-    return;
-  }
   const raw = wordInput.value.trim().toLowerCase();
   if (!raw) return;
   if (words.find(w => w.word === raw)) {
