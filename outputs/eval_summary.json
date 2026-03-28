@@ -1,0 +1,312 @@
+{
+  "generated_at": "2026-03-28T15:08:56.890380+00:00",
+  "model_quality": {
+    "n_words_total": 70535,
+    "n_converged": 68807,
+    "n_failed": 1728,
+    "convergence_rate": 0.975502,
+    "aic_mean": 254.1329,
+    "aic_median": 276.797,
+    "failed_words": [
+      "caballada",
+      "caboodle",
+      "cachinnans",
+      "cachorros",
+      "cacomistle",
+      "caddy",
+      "cadence",
+      "caedibus",
+      "caelum",
+      "caesuras",
+      "caeterorum",
+      "cafetorium",
+      "caffeol",
+      "cagemate",
+      "caityas",
+      "cajoled",
+      "calabashes",
+      "caladium",
+      "calca",
+      "calcerous",
+      "calcifuges",
+      "calculatedly",
+      "calefacit",
+      "calenda",
+      "calibrator",
+      "cality",
+      "calla",
+      "calld",
+      "callosus",
+      "calorifacient",
+      "calretinin",
+      "calted",
+      "calumniam",
+      "cam",
+      "camem",
+      "camen",
+      "camillus",
+      "campaigning",
+      "campanarum",
+      "campmeetings",
+      "canals",
+      "cancelled",
+      "cand",
+      "candell",
+      "candlewicks",
+      "canelike",
+      "canere",
+      "canj",
+      "cankered",
+      "canned"
+    ]
+  },
+  "word_sanity": {
+    "war": {
+      "peak_year": 1943,
+      "n_changepoints": 7,
+      "dominant_regime": "stable"
+    },
+    "computer": {
+      "peak_year": 1990,
+      "n_changepoints": 5,
+      "dominant_regime": "adoption"
+    },
+    "technology": {
+      "peak_year": 2001,
+      "n_changepoints": 5,
+      "dominant_regime": "adoption"
+    },
+    "typewriter": {
+      "peak_year": 1943,
+      "n_changepoints": 3,
+      "dominant_regime": "adoption"
+    },
+    "wireless": {
+      "peak_year": 2005,
+      "n_changepoints": 1,
+      "dominant_regime": "adoption"
+    }
+  },
+  "changepoint_sanity": {
+    "top_cp_years": [
+      1829,
+      1974,
+      1834,
+      1819,
+      1979,
+      1939,
+      1869,
+      1824,
+      1904,
+      1969
+    ],
+    "cp_density_peak_year": 1829,
+    "near_event_rate": 0.4
+  },
+  "factor_interpretability": {
+    "factor_1": {
+      "top_words": [
+        "walkt",
+        "tributary",
+        "cinge",
+        "tumet",
+        "wassailing",
+        "churner",
+        "cromis",
+        "teez",
+        "correctionnelle",
+        "thejustice"
+      ],
+      "explained_variance": 0.582797
+    },
+    "factor_2": {
+      "top_words": [
+        "comform",
+        "cubation",
+        "constatera",
+        "concordants",
+        "convenants",
+        "calcule",
+        "whlle",
+        "cloaque",
+        "constructural",
+        "campfollower"
+      ],
+      "explained_variance": 0.239245
+    },
+    "factor_3": {
+      "top_words": [
+        "trapesing",
+        "ttimes",
+        "whereso",
+        "cracknel",
+        "cariages",
+        "treadwheel",
+        "wellpoised",
+        "tiresome",
+        "whimperingly",
+        "within"
+      ],
+      "explained_variance": 0.08438
+    },
+    "factor_4": {
+      "top_words": [
+        "tribulations",
+        "ciass",
+        "congeniality",
+        "ciose",
+        "conveyeth",
+        "tantisper",
+        "tit",
+        "wetnurse",
+        "chical",
+        "cheveron"
+      ],
+      "explained_variance": 0.036839
+    },
+    "factor_5": {
+      "top_words": [
+        "charao",
+        "cbarge",
+        "whatevei",
+        "territoiy",
+        "temporaiy",
+        "theru",
+        "cognates",
+        "capitalia",
+        "cattlo",
+        "conjunctivas"
+      ],
+      "explained_variance": 0.021697
+    },
+    "factor_6": {
+      "top_words": [
+        "tenement",
+        "charioteering",
+        "crashes",
+        "culturo",
+        "chanco",
+        "tomorra",
+        "womon",
+        "chango",
+        "thumbtacked",
+        "tablo"
+      ],
+      "explained_variance": 0.011805
+    },
+    "factor_7": {
+      "top_words": [
+        "copies",
+        "chromatins",
+        "coalbased",
+        "tanager",
+        "transactivation",
+        "camivalesque",
+        "craignait",
+        "thoracoscopy",
+        "cyanophages",
+        "connectionists"
+      ],
+      "explained_variance": 0.006359
+    },
+    "factor_8": {
+      "top_words": [
+        "taid",
+        "coagulability",
+        "civic",
+        "tine",
+        "twe",
+        "cauuot",
+        "tiie",
+        "couduct",
+        "commingle",
+        "clinkers"
+      ],
+      "explained_variance": 0.004631
+    },
+    "factor_9": {
+      "top_words": [
+        "transconductor",
+        "coalgebra",
+        "covariogram",
+        "contractualisation",
+        "chemokine",
+        "cosleeping",
+        "whodunit",
+        "taqueria",
+        "cybernaut",
+        "collahorative"
+      ],
+      "explained_variance": 0.002875
+    },
+    "factor_10": {
+      "top_words": [
+        "tw",
+        "tetranitrate",
+        "creatinine",
+        "colonial",
+        "tins",
+        "centrifugalized",
+        "whep",
+        "chemokine",
+        "thwarted",
+        "contractualisation"
+      ],
+      "explained_variance": 0.002089
+    }
+  },
+  "lii_sanity": {
+    "peak_year": 1987,
+    "peak_value": 78.8891,
+    "min_value": 1.7629,
+    "max_value": 78.8891,
+    "cp_lii_correlation": -0.014889
+  },
+  "failures": {
+    "n_failed_fits": 1728,
+    "extreme_drift_words": [
+      "counterproliferation",
+      "thymidylate",
+      "tirilazad",
+      "termcap",
+      "teboroxime",
+      "calmodul",
+      "chmod",
+      "coprocessors",
+      "carbendazim",
+      "clarithromycin",
+      "cholangiopancreatography",
+      "teprotide",
+      "terminfo",
+      "cromoglycate",
+      "cdev",
+      "transideological",
+      "cybercrime",
+      "cypermethrin",
+      "tsotsis",
+      "congresspeople"
+    ],
+    "high_instability_words": [
+      "tsayt",
+      "characean",
+      "clericalization",
+      "commirment",
+      "clubmaker",
+      "closeorder",
+      "chlorinators",
+      "ttymon",
+      "watermain",
+      "coccoid",
+      "conjunctural",
+      "tensioner",
+      "cryptographers",
+      "textbase",
+      "weatherman",
+      "washouts",
+      "capitalisme",
+      "thamin",
+      "wrapup",
+      "trihal"
+    ]
+  }
+}

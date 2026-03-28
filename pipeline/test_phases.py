@@ -36,6 +36,7 @@ OUTPUTS_FACTORS_JSON = "outputs/factor_trajectories.json"
 OUTPUTS_EVENTS_JSON  = "outputs/events.json"
 OUTPUTS_WORD_INDEX   = "outputs/word_index.json"
 OUTPUTS_WORDS_DIR    = "outputs/words"
+EVAL_SUMMARY         = "outputs/eval_summary.json"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -1435,3 +1436,145 @@ class TestPhase10Export:
             f"war.json has changepoints {extra} not in changepoints.parquet: "
             f"pipeline={sorted(pipeline_cps)}"
         )
+
+
+# ── Phase 11: Evaluation and Sanity Checks ────────────────────
+class TestPhase11Eval:
+    """15 tests verifying outputs/eval_summary.json produced by 11_eval.py."""
+
+    ANCHOR_WORDS = ["war", "computer", "technology", "typewriter", "wireless"]
+
+    # ── Fixture ───────────────────────────────────────────────
+
+    @pytest.fixture(scope="class")
+    def summary(self):
+        import json
+        with open(EVAL_SUMMARY) as f:
+            return json.load(f)
+
+    # ── a. Eval summary structure (2 tests) ───────────────────
+
+    def test_eval_summary_exists(self):
+        """outputs/eval_summary.json must exist."""
+        assert os.path.exists(EVAL_SUMMARY), f"Missing: {EVAL_SUMMARY}"
+
+    def test_eval_summary_top_level_keys(self, summary):
+        """Must have all 6 top-level section keys."""
+        required = {
+            "model_quality", "word_sanity", "changepoint_sanity",
+            "factor_interpretability", "lii_sanity", "failures",
+        }
+        missing = required - set(summary.keys())
+        assert not missing, f"eval_summary.json missing top-level keys: {missing}"
+
+    # ── b. Model quality (3 tests) ────────────────────────────
+
+    def test_convergence_rate_high(self, summary):
+        """At least 90% of words must have converged fits."""
+        rate = summary["model_quality"]["convergence_rate"]
+        assert rate >= 0.90, (
+            f"convergence_rate={rate:.4f} < 0.90 — "
+            "too many failed fits"
+        )
+
+    def test_failed_words_is_list(self, summary):
+        """model_quality['failed_words'] must be a list."""
+        assert isinstance(summary["model_quality"]["failed_words"], list), (
+            "failed_words should be a list"
+        )
+
+    def test_aic_median_finite(self, summary):
+        """AIC median must be a finite number (not None or NaN)."""
+        import math
+        aic_median = summary["model_quality"]["aic_median"]
+        assert aic_median is not None, "aic_median is null"
+        assert isinstance(aic_median, (int, float)), (
+            f"aic_median type {type(aic_median).__name__} — expected numeric"
+        )
+        assert math.isfinite(aic_median), f"aic_median={aic_median} is not finite"
+
+    # ── c. Word sanity (4 tests) ──────────────────────────────
+
+    def test_anchor_words_present(self, summary):
+        """All 5 anchor words must appear in word_sanity."""
+        ws = summary["word_sanity"]
+        missing = [w for w in self.ANCHOR_WORDS if w not in ws]
+        assert not missing, f"word_sanity missing anchor words: {missing}"
+
+    def test_war_peak_plausible(self, summary):
+        """'war' peak year must be in [1905, 1960] (WWI/WWII era)."""
+        peak = summary["word_sanity"]["war"]["peak_year"]
+        assert 1905 <= peak <= 1960, (
+            f"war peak_year={peak} outside [1905, 1960]"
+        )
+
+    def test_computer_peak_plausible(self, summary):
+        """'computer' peak year must be >= 1960 (computing era)."""
+        peak = summary["word_sanity"]["computer"]["peak_year"]
+        assert peak >= 1960, (
+            f"computer peak_year={peak} < 1960 — expected in computing era"
+        )
+
+    def test_anchor_changepoints_nonzero(self, summary):
+        """Every anchor word must have at least 1 detected changepoint."""
+        ws = summary["word_sanity"]
+        for word in self.ANCHOR_WORDS:
+            if word not in ws:
+                continue
+            ncp = ws[word]["n_changepoints"]
+            assert ncp > 0, (
+                f"'{word}' has n_changepoints={ncp} — expected > 0"
+            )
+
+    # ── d. Changepoint sanity (2 tests) ───────────────────────
+
+    def test_top_cp_years_plausible(self, summary):
+        """At least 1 of the top 10 CP years must fall in a historically turbulent era."""
+        years = summary["changepoint_sanity"]["top_cp_years"]
+        plausible = any(
+            (1905 <= y <= 1955) or (1965 <= y <= 2005)
+            for y in years
+        )
+        assert plausible, (
+            f"None of the top CP years {years} fall in [1905,1955] or [1965,2005]"
+        )
+
+    def test_near_event_rate_positive(self, summary):
+        """At least one of the top 10 CP years must be near a historical event start."""
+        rate = summary["changepoint_sanity"]["near_event_rate"]
+        assert rate > 0.0, (
+            f"near_event_rate={rate} — no top CP year is within ±5 years of any event start"
+        )
+
+    # ── e. Factor sanity (2 tests) ────────────────────────────
+
+    def test_factor1_top_words_nonempty(self, summary):
+        """Factor 1 must have a non-empty list of top-loading words."""
+        top = summary["factor_interpretability"]["factor_1"]["top_words"]
+        assert isinstance(top, list) and len(top) > 0, (
+            "factor_1 top_words is empty or not a list"
+        )
+
+    def test_factor1_variance_dominant(self, summary):
+        """Factor 1 must explain more than 50% of variance."""
+        ev = summary["factor_interpretability"]["factor_1"]["explained_variance"]
+        assert ev is not None and ev > 0.50, (
+            f"factor_1 explained_variance={ev} <= 0.50 — Factor 1 should dominate"
+        )
+
+    # ── f. LII sanity (2 tests) ───────────────────────────────
+
+    def test_lii_peak_plausible(self, summary):
+        """LII peak year must be in [1960, 2005] (computing/digital era)."""
+        peak = summary["lii_sanity"]["peak_year"]
+        assert 1960 <= peak <= 2005, (
+            f"lii peak_year={peak} outside [1960, 2005]"
+        )
+
+    def test_lii_cp_correlation_finite(self, summary):
+        """cp_lii_correlation must be a finite float (not NaN or None)."""
+        import math
+        corr = summary["lii_sanity"]["cp_lii_correlation"]
+        assert corr is not None, "cp_lii_correlation is None"
+        assert isinstance(corr, float), f"cp_lii_correlation is not a float: {corr!r}"
+        assert math.isfinite(corr), f"cp_lii_correlation={corr} is not finite"
