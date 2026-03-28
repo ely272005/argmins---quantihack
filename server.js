@@ -30,6 +30,7 @@ app.get('/api/word-index',      (_, res) => { const d = loadJSON('word_index.jso
 app.get('/api/word-map',        (_, res) => { const d = loadJSON('word_map.json');               d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
 app.get('/api/predictions',     (_, res) => { const d = loadJSON('predictions.json');            d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
 app.get('/api/prediction-eval', (_, res) => { const d = loadJSON('prediction_eval.json');        d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
+app.get('/api/shift-detection', (_, res) => { const d = loadJSON('shift_detection.json');       d ? res.json(d) : res.status(503).json({error:'not exported yet'}); });
 
 app.get('/api/word/:word', (req, res) => {
   const word = req.params.word.toLowerCase().replace(/[^a-z]/g, '');

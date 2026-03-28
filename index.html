@@ -440,6 +440,7 @@
     <button class="tab-btn" id="tab-factors" onclick="showTab('factors')">factor explorer</button>
     <button class="tab-btn" id="tab-wordmap" onclick="showTab('wordmap')">word map</button>
     <button class="tab-btn" id="tab-emerging" onclick="showTab('emerging')">emerging words</button>
+    <button class="tab-btn" id="tab-shift" onclick="showTab('shift')">shift detector</button>
   </nav>
 
   <!-- ── Word Explorer section ───────────────────────── -->
@@ -634,6 +635,76 @@
     </div>
   </div><!-- end section-emerging -->
 
+  <!-- ── Cultural Shift Detector section ────────────────── -->
+  <div class="tab-section" id="section-shift">
+    <div class="card" style="margin-bottom:20px;">
+      <h2 style="margin:0 0 6px 0;">Cultural Shift Detector</h2>
+      <p style="color:#7a7875;margin:0 0 12px 0;font-size:13px;line-height:1.5;">
+        Detects periods of cultural change purely from linguistic signals — without being told anything about history.
+        <br>ShiftScore = z(LII) + z(changepoint density). High values = the language system is under stress.
+      </p>
+      <div id="shiftDetectionBanner" style="padding:10px 16px;border-radius:6px;font-family:'DM Mono';font-size:14px;margin-bottom:16px;background:rgba(255,255,255,0.03);"></div>
+    </div>
+
+    <!-- Main timeline chart -->
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 10px 0;">ShiftScore timeline</h3>
+      <p style="color:#7a7875;margin:0 0 10px 0;font-size:12px;">
+        Shaded regions = known historical events. Peaks show where our system detects cultural upheaval.
+      </p>
+      <div style="position:relative;width:100%;height:340px;">
+        <canvas id="shiftTimelineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Dual decomposition: LII z-score + CP z-score -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">LII z-score</h3>
+        <div style="position:relative;width:100%;height:220px;">
+          <canvas id="shiftLiiChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">changepoint density z-score</h3>
+        <div style="position:relative;width:100%;height:220px;">
+          <canvas id="shiftCpChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Shift type breakdown + detected events -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+      <div class="card">
+        <h3 style="margin:0 0 10px 0;">Shift type classification</h3>
+        <p style="color:#7a7875;margin:0 0 10px 0;font-size:12px;">Each year classified by the pattern of its LII and changepoint signals.</p>
+        <div style="position:relative;width:100%;height:260px;">
+          <canvas id="shiftTypeChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 10px 0;">Event detection results</h3>
+        <p style="color:#7a7875;margin:0 0 10px 0;font-size:12px;">Did the system detect each known historical event?</p>
+        <div id="shiftEventTable" style="max-height:300px;overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <!-- Feature importances -->
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="margin:0 0 10px 0;">Feature importances (supervised model)</h3>
+      <div style="position:relative;width:100%;height:260px;">
+        <canvas id="shiftFeatureChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Detected peaks table -->
+    <div class="card">
+      <h3 style="margin:0 0 10px 0;">Detected cultural shift peaks</h3>
+      <p style="color:#7a7875;margin:0 0 10px 0;font-size:12px;">Years where ShiftScore > 1.5 (strong signal)</p>
+      <div id="shiftPeaksTable" style="max-height:400px;overflow-y:auto;"></div>
+    </div>
+  </div><!-- end section-shift -->
+
 </main>
 
 <script>
@@ -647,6 +718,7 @@ function showTab(name) {
   if (name === 'factors'   && !factorsLoaded) loadFactors();
   if (name === 'wordmap'   && !wordmapLoaded) loadWordMap();
   if (name === 'emerging'  && !emergingLoaded) loadEmerging();
+  if (name === 'shift'     && !shiftLoaded) loadShiftDetector();
 }
 
 // ── Main constants ─────────────────────────────────────────────
@@ -1612,6 +1684,281 @@ function renderFeatureChart(importances) {
       }
     }
   });
+}
+
+// ── Cultural Shift Detector ───────────────────────────────────────
+let shiftLoaded = false, shiftData = null;
+let shiftCharts = {};
+
+async function loadShiftDetector() {
+  try {
+    const res = await fetch(`${API}/api/shift-detection`);
+    shiftData = await res.json();
+    shiftLoaded = true;
+    renderShiftDetector();
+  } catch (e) {
+    console.error('Failed to load shift detection data', e);
+  }
+}
+
+function renderShiftDetector() {
+  const d = shiftData;
+
+  // ── Detection banner ─────────────────────────────────────
+  const banner = document.getElementById('shiftDetectionBanner');
+  const rate = d.detection_pct;
+  const color = rate >= 90 ? '#a8c8a0' : rate >= 70 ? '#ffb74d' : '#c87878';
+  banner.innerHTML = `<span style="color:${color};font-weight:700;font-size:22px;">${d.detection_rate}</span>`
+    + ` <span style="color:#7a7875;">historical events detected (${rate}%) — purely from language patterns, no historical labels used at detection time</span>`;
+
+  // ── Shift type colors ────────────────────────────────────
+  const TYPE_COLORS = {
+    structural_upheaval:   'rgba(200,120,120,0.85)',
+    smooth_transformation: 'rgba(168,200,160,0.85)',
+    localized_restructuring: 'rgba(143,168,200,0.85)',
+    stable:                'rgba(122,120,117,0.35)',
+  };
+
+  const CATEGORY_COLORS = {
+    conflict:   'rgba(200,120,120,0.15)',
+    health:     'rgba(168,200,160,0.15)',
+    political:  'rgba(184,168,216,0.15)',
+    economic:   'rgba(216,200,160,0.15)',
+    technology: 'rgba(143,168,200,0.15)',
+  };
+
+  // ── Build event annotation boxes (Chart.js plugin) ───────
+  const eventBoxes = d.events.map(ev => ({
+    name: ev.name, start: ev.start, end: ev.end,
+    color: CATEGORY_COLORS[ev.category] || 'rgba(255,255,255,0.05)',
+  }));
+
+  const eventBoxPlugin = {
+    id: 'eventBoxes',
+    beforeDraw(chart) {
+      const { ctx, chartArea: { left, right, top, bottom }, scales: { x } } = chart;
+      eventBoxes.forEach(ev => {
+        const x1 = x.getPixelForValue(ev.start);
+        const x2 = x.getPixelForValue(ev.end);
+        if (x2 < left || x1 > right) return;
+        ctx.save();
+        ctx.fillStyle = ev.color;
+        ctx.fillRect(Math.max(x1, left), top, Math.min(x2, right) - Math.max(x1, left), bottom - top);
+        ctx.restore();
+      });
+    }
+  };
+
+  // ── Main timeline chart ──────────────────────────────────
+  const years = d.timeline.map(t => t.year);
+  const scores = d.timeline.map(t => t.shift_score);
+
+  // Color each bar by shift type
+  const barColors = d.timeline.map(t => TYPE_COLORS[t.shift_type] || 'rgba(122,120,117,0.3)');
+
+  if (shiftCharts.timeline) shiftCharts.timeline.destroy();
+  shiftCharts.timeline = new Chart(document.getElementById('shiftTimelineChart'), {
+    type: 'bar',
+    data: {
+      labels: years,
+      datasets: [{
+        data: scores,
+        backgroundColor: barColors,
+        borderWidth: 0,
+        barPercentage: 1.0,
+        categoryPercentage: 1.0,
+      }]
+    },
+    plugins: [eventBoxPlugin],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `Year ${ctx[0].label}`,
+            label: ctx => {
+              const t = d.timeline[ctx[0].dataIndex];
+              return [
+                `ShiftScore: ${t.shift_score.toFixed(2)}`,
+                `Type: ${t.shift_type.replace(/_/g, ' ')}`,
+                `LII z: ${t.lii_z.toFixed(2)}  |  CP z: ${t.cp_z.toFixed(2)}`,
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 },
+                   maxTicksLimit: 20 },
+          grid: { display: false },
+          border: { color: 'rgba(255,255,255,0.07)' },
+        },
+        y: {
+          title: { display: true, text: 'ShiftScore (z-units)', color: '#7a7875',
+                   font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' },
+        }
+      }
+    }
+  });
+
+  // ── LII z-score chart ────────────────────────────────────
+  if (shiftCharts.lii) shiftCharts.lii.destroy();
+  shiftCharts.lii = new Chart(document.getElementById('shiftLiiChart'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        data: d.timeline.map(t => t.lii_z),
+        borderColor: '#c8b89a',
+        backgroundColor: 'rgba(200,184,154,0.1)',
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5,
+      }]
+    },
+    plugins: [eventBoxPlugin],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 8 }, maxTicksLimit: 10 },
+             grid: { display: false }, border: { color: 'rgba(255,255,255,0.07)' } },
+        y: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 8 } },
+             grid: { color: 'rgba(255,255,255,0.04)' },
+             border: { color: 'rgba(255,255,255,0.07)' } }
+      }
+    }
+  });
+
+  // ── CP z-score chart ─────────────────────────────────────
+  if (shiftCharts.cp) shiftCharts.cp.destroy();
+  shiftCharts.cp = new Chart(document.getElementById('shiftCpChart'), {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        data: d.timeline.map(t => t.cp_z),
+        borderColor: '#8fa8c8',
+        backgroundColor: 'rgba(143,168,200,0.1)',
+        fill: true, tension: 0.3, pointRadius: 0, borderWidth: 1.5,
+      }]
+    },
+    plugins: [eventBoxPlugin],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 8 }, maxTicksLimit: 10 },
+             grid: { display: false }, border: { color: 'rgba(255,255,255,0.07)' } },
+        y: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 8 } },
+             grid: { color: 'rgba(255,255,255,0.04)' },
+             border: { color: 'rgba(255,255,255,0.07)' } }
+      }
+    }
+  });
+
+  // ── Shift type stacked area chart ────────────────────────
+  // Build rolling 10-year type counts
+  const typeNames = ['structural_upheaval', 'smooth_transformation', 'localized_restructuring', 'stable'];
+  const typeLabels = ['structural upheaval', 'smooth transformation', 'localized restructuring', 'stable'];
+  const typeColors = [TYPE_COLORS.structural_upheaval, TYPE_COLORS.smooth_transformation,
+                      TYPE_COLORS.localized_restructuring, TYPE_COLORS.stable];
+
+  if (shiftCharts.type) shiftCharts.type.destroy();
+  shiftCharts.type = new Chart(document.getElementById('shiftTypeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: typeLabels,
+      datasets: [{
+        data: typeNames.map(tn => d.shift_type_counts[tn] || 0),
+        backgroundColor: typeColors,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#c8b89a', font: { family: 'DM Mono', size: 10 },
+                  padding: 12, boxWidth: 12 } }
+      }
+    }
+  });
+
+  // ── Event detection table ────────────────────────────────
+  const evTable = document.getElementById('shiftEventTable');
+  evTable.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-family:'DM Mono';font-size:12px;">
+      <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+        <th style="text-align:left;padding:6px 8px;color:#7a7875;">event</th>
+        <th style="text-align:center;padding:6px 4px;color:#7a7875;">peak year</th>
+        <th style="text-align:center;padding:6px 4px;color:#7a7875;">score</th>
+        <th style="text-align:center;padding:6px 4px;color:#7a7875;">detected</th>
+      </tr></thead>
+      <tbody>${d.detections.map(det => {
+        const icon = det.detected ? '&#10003;' : '&#10007;';
+        const color = det.detected ? '#a8c8a0' : '#c87878';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:5px 8px;">${det.event}</td>
+          <td style="text-align:center;padding:5px 4px;">${det.peak_year || '—'}</td>
+          <td style="text-align:center;padding:5px 4px;">${det.peak_score.toFixed(2)}</td>
+          <td style="text-align:center;padding:5px 4px;color:${color};font-size:15px;">${icon}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+
+  // ── Feature importances ──────────────────────────────────
+  const feats = d.feature_importances;
+  if (shiftCharts.features) shiftCharts.features.destroy();
+  shiftCharts.features = new Chart(document.getElementById('shiftFeatureChart'), {
+    type: 'bar',
+    data: {
+      labels: Object.keys(feats),
+      datasets: [{
+        data: Object.values(feats),
+        backgroundColor: 'rgba(200,184,154,0.6)',
+        borderColor: '#c8b89a',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+             grid: { color: 'rgba(255,255,255,0.04)' },
+             border: { color: 'rgba(255,255,255,0.07)' } },
+        y: { ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+             grid: { display: false },
+             border: { color: 'rgba(255,255,255,0.07)' } }
+      }
+    }
+  });
+
+  // ── Detected peaks table ─────────────────────────────────
+  const peaksDiv = document.getElementById('shiftPeaksTable');
+  peaksDiv.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-family:'DM Mono';font-size:12px;">
+      <thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08);">
+        <th style="text-align:left;padding:6px 8px;color:#7a7875;">year</th>
+        <th style="text-align:center;padding:6px 8px;color:#7a7875;">ShiftScore</th>
+        <th style="text-align:center;padding:6px 8px;color:#7a7875;">type</th>
+        <th style="text-align:left;padding:6px 8px;color:#7a7875;">nearby event</th>
+      </tr></thead>
+      <tbody>${d.detected_peaks.map(p => {
+        const nearby = d.events.find(ev => p.year >= ev.start - 3 && p.year <= ev.end + 3);
+        const typeColor = TYPE_COLORS[p.shift_type] || '#7a7875';
+        return `<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">
+          <td style="padding:5px 8px;font-weight:600;">${p.year}</td>
+          <td style="text-align:center;padding:5px 8px;">${p.shift_score.toFixed(2)}</td>
+          <td style="text-align:center;padding:5px 8px;color:${typeColor};">${p.shift_type.replace(/_/g, ' ')}</td>
+          <td style="padding:5px 8px;color:#7a7875;">${nearby ? nearby.name : '—'}</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
 }
 </script>
 </body>
