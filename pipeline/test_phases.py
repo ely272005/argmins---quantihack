@@ -1,5 +1,5 @@
 """
-Sanity tests for Phase 2 (clean) and Phase 3 (smooth) outputs.
+Sanity tests for Phase 2 (clean), Phase 3 (smooth), and Phase 4 (word model) outputs.
 
 Run with:
     source venv/bin/activate
@@ -17,6 +17,8 @@ import pytest
 CLEAN_PANEL  = "data/processed/clean_panel.parquet"
 VOCAB_META   = "data/processed/vocabulary_metadata.parquet"
 SMOOTHED     = "data/processed/smoothed_word_series.parquet"
+WORD_FITS    = "data/processed/word_level_fits.parquet"
+WORD_SUMMARY = "data/processed/word_summary_metrics.parquet"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -240,3 +242,151 @@ class TestPhase3Smoothed:
             expected = list(range(years[0], years[-1] + 1))
             assert years == expected, \
                 f"Years for '{w}' are not a contiguous range: {years[:10]}..."
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 4 — word_level_fits.parquet + word_summary_metrics.parquet
+# ══════════════════════════════════════════════════════════════
+
+@pytest.fixture(scope="session")
+def word_fits():
+    return pl.read_parquet(WORD_FITS)
+
+@pytest.fixture(scope="session")
+def word_summary():
+    return pl.read_parquet(WORD_SUMMARY)
+
+
+class TestPhase4WordFits:
+
+    def test_file_exists(self):
+        assert os.path.isfile(WORD_FITS), f"Missing: {WORD_FITS}"
+
+    def test_schema(self, word_fits):
+        expected = {
+            "word", "year", "observed_count", "frequency",
+            "latent_level", "latent_drift", "curvature",
+            "lower_ci", "upper_ci", "local_instability"
+        }
+        assert set(word_fits.columns) == expected
+
+    def test_every_word_has_209_rows(self, word_fits):
+        rows_per_word = word_fits.group_by("word").agg(pl.len().alias("n"))
+        bad = rows_per_word.filter(pl.col("n") != 209)
+        assert len(bad) == 0, \
+            f"{len(bad)} words do not have exactly 209 rows: {bad.head(5)}"
+
+    def test_year_range(self, word_fits):
+        assert word_fits["year"].min() == YEAR_MIN
+        assert word_fits["year"].max() == YEAR_MAX
+
+    def test_kalman_states_no_nulls(self, word_fits):
+        # latent_level, latent_drift, lower_ci, upper_ci must always be non-null
+        for col in ["latent_level", "latent_drift", "lower_ci", "upper_ci"]:
+            n = word_fits[col].null_count()
+            assert n == 0, f"{col} has {n} null values"
+
+    def test_kalman_states_finite(self, word_fits):
+        for col in ["latent_level", "latent_drift"]:
+            n_inf = word_fits.filter(pl.col(col).is_infinite()).shape[0]
+            assert n_inf == 0, f"{col} has {n_inf} infinite values"
+
+    def test_ci_ordering(self, word_fits):
+        # lower_ci must always be <= upper_ci
+        bad = word_fits.filter(pl.col("lower_ci") > pl.col("upper_ci"))
+        assert len(bad) == 0, f"{len(bad)} rows where lower_ci > upper_ci"
+
+    def test_curvature_nan_only_at_first_year(self, word_fits):
+        # curvature is NaN only at year 1800 (first year per word)
+        nan_rows = word_fits.filter(pl.col("curvature").is_null())
+        assert nan_rows["year"].unique().to_list() == [YEAR_MIN], \
+            "curvature is null at years other than 1800"
+
+    def test_observed_count_nan_for_missing_years(self, word_fits):
+        # observed_count is NaN for unobserved years — must have SOME non-null values
+        n_null  = word_fits["observed_count"].null_count()
+        n_total = len(word_fits)
+        frac_observed = 1 - n_null / n_total
+        assert frac_observed > 0.5, \
+            f"Too many null observed_count rows: {n_null}/{n_total}"
+
+    def test_word_count_matches_clean_panel(self, clean, word_fits):
+        n_clean = clean["word"].n_unique()
+        n_fits  = word_fits["word"].n_unique()
+        assert n_fits == n_clean, \
+            f"word_level_fits has {n_fits} words but clean_panel has {n_clean}"
+
+    def test_computer_latent_drift_positive_post_1960(self, word_fits):
+        sub = word_fits.filter(
+            (pl.col("word") == "computer") &
+            (pl.col("year") >= 1960) &
+            (pl.col("year") <= 1990)
+        )
+        assert len(sub) > 0, "'computer' not found in word_level_fits"
+        assert sub["latent_drift"].mean() > 0, \
+            f"Expected positive latent_drift for 'computer' 1960-1990"
+
+    def test_row_count_reasonable(self, word_fits):
+        # 70k words × 209 years
+        assert len(word_fits) > 14_000_000, f"Too few rows: {len(word_fits)}"
+
+
+class TestPhase4WordSummary:
+
+    def test_file_exists(self):
+        assert os.path.isfile(WORD_SUMMARY), f"Missing: {WORD_SUMMARY}"
+
+    def test_schema(self, word_summary):
+        expected = {
+            "word", "mean_drift", "current_drift", "mean_curvature",
+            "current_curvature", "mean_instability", "peak_year",
+            "sigma2_obs", "sigma2_level", "sigma2_drift", "aic", "fit_status"
+        }
+        assert set(word_summary.columns) == expected
+
+    def test_one_row_per_word(self, word_fits, word_summary):
+        n_fits    = word_fits["word"].n_unique()
+        n_summary = len(word_summary)
+        assert n_fits == n_summary, \
+            f"word_level_fits has {n_fits} unique words but summary has {n_summary} rows"
+
+    def test_no_nulls(self, word_summary):
+        nulls = word_summary.null_count().row(0)
+        assert all(n == 0 for n in nulls), \
+            f"Nulls found: {dict(zip(word_summary.columns, nulls))}"
+
+    def test_peak_year_in_range(self, word_summary):
+        assert word_summary["peak_year"].min() >= YEAR_MIN
+        assert word_summary["peak_year"].max() <= YEAR_MAX
+
+    def test_sigma2_values_non_negative(self, word_summary):
+        for col in ["sigma2_obs", "sigma2_level", "sigma2_drift"]:
+            assert word_summary[col].min() >= 0, f"{col} has negative values"
+
+    def test_fit_status_values(self, word_summary):
+        valid_statuses = {"converged", "warn_1", "warn_2", "failed"}
+        actual = set(word_summary["fit_status"].unique().to_list())
+        unexpected = actual - valid_statuses
+        assert len(unexpected) == 0, f"Unexpected fit_status values: {unexpected}"
+
+    def test_convergence_rate(self, word_summary):
+        # At least 90% of words should converge cleanly
+        n_converged = word_summary.filter(pl.col("fit_status") == "converged").shape[0]
+        rate = n_converged / len(word_summary)
+        assert rate >= 0.90, f"Convergence rate too low: {rate:.1%}"
+
+    def test_no_hard_failures(self, word_summary):
+        n_failed = word_summary.filter(pl.col("fit_status") == "failed").shape[0]
+        assert n_failed == 0, f"{n_failed} words had hard fit failures"
+
+    def test_aic_is_finite(self, word_summary):
+        n_inf = word_summary.filter(pl.col("aic").is_infinite()).shape[0]
+        assert n_inf == 0, f"aic has {n_inf} infinite values"
+
+    def test_sigma2_drift_distribution(self, word_summary):
+        # Most words should have near-zero drift noise (stable series)
+        # but some should have meaningful drift noise (dynamic words)
+        n_stable  = word_summary.filter(pl.col("sigma2_drift") < 1e-6).shape[0]
+        n_dynamic = word_summary.filter(pl.col("sigma2_drift") > 1e-6).shape[0]
+        assert n_stable  > 1000, "Too few stable words (sigma2_drift < 1e-6)"
+        assert n_dynamic > 1000, "Too few dynamic words (sigma2_drift > 1e-6)"
