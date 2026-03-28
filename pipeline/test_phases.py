@@ -20,9 +20,12 @@ VOCAB_META    = "data/processed/vocabulary_metadata.parquet"
 SMOOTHED      = "data/processed/smoothed_word_series.parquet"
 WORD_FITS     = "data/processed/word_level_fits.parquet"
 WORD_SUMMARY  = "data/processed/word_summary_metrics.parquet"
-CHANGEPOINTS  = "data/processed/changepoints.parquet"
-DENSITY       = "data/processed/changepoint_density.parquet"
-REGIMES       = "data/processed/regimes.parquet"
+CHANGEPOINTS         = "data/processed/changepoints.parquet"
+DENSITY              = "data/processed/changepoint_density.parquet"
+REGIMES              = "data/processed/regimes.parquet"
+FACTOR_TRAJECTORIES  = "data/processed/factor_trajectories.parquet"
+FACTOR_LOADINGS      = "data/processed/factor_loadings.parquet"
+FACTOR_METADATA_JSON = "data/processed/factor_metadata.json"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -699,4 +702,219 @@ class TestPhase6Regimes:
         assert turb_near > turb_far, (
             f"Turbulent rate near changepoints ({turb_near:.3f}) is not greater "
             f"than baseline ({turb_far:.3f})"
+        )
+
+
+# ── Phase 7: System-Wide Latent Factor Model ──────────────────────────────────
+
+class TestPhase7FactorModel:
+    """Validates the three outputs of pipeline/07_factor_model.py."""
+
+    @pytest.fixture(scope="class")
+    def trajectories(self):
+        return pl.read_parquet(FACTOR_TRAJECTORIES)
+
+    @pytest.fixture(scope="class")
+    def loadings(self):
+        return pl.read_parquet(FACTOR_LOADINGS)
+
+    @pytest.fixture(scope="class")
+    def meta(self):
+        import json as _json
+        with open(FACTOR_METADATA_JSON) as f:
+            return _json.load(f)
+
+    @pytest.fixture(scope="class")
+    def word_fits(self):
+        return pl.read_parquet(WORD_FITS, columns=["word"]).unique()
+
+    # ── a. Structural ─────────────────────────────────────────
+
+    def test_files_exist(self):
+        assert os.path.isfile(FACTOR_TRAJECTORIES),  f"Missing: {FACTOR_TRAJECTORIES}"
+        assert os.path.isfile(FACTOR_LOADINGS),      f"Missing: {FACTOR_LOADINGS}"
+        assert os.path.isfile(FACTOR_METADATA_JSON), f"Missing: {FACTOR_METADATA_JSON}"
+
+    def test_trajectories_schema(self, trajectories, meta):
+        n = meta["n_factors"]
+        expected = {"year"} | {f"factor_{i + 1}" for i in range(n)}
+        actual = set(trajectories.columns)
+        assert actual == expected, (
+            f"Trajectory columns {actual} != expected {expected}"
+        )
+
+    def test_loadings_schema(self, loadings, meta):
+        n = meta["n_factors"]
+        expected = {"word"} | {f"factor_{i + 1}" for i in range(n)}
+        actual = set(loadings.columns)
+        assert actual == expected, (
+            f"Loading columns {actual} != expected {expected}"
+        )
+
+    def test_no_nulls(self, trajectories, loadings):
+        for col in trajectories.columns:
+            n = trajectories[col].null_count()
+            assert n == 0, f"factor_trajectories['{col}'] has {n} null values"
+        for col in loadings.columns:
+            n = loadings[col].null_count()
+            assert n == 0, f"factor_loadings['{col}'] has {n} null values"
+
+    # ── b. Shape ──────────────────────────────────────────────
+
+    def test_trajectory_row_count(self, trajectories):
+        assert len(trajectories) == 209, (
+            f"Expected 209 rows in factor_trajectories, got {len(trajectories)}"
+        )
+
+    def test_trajectory_year_range(self, trajectories):
+        years = sorted(trajectories["year"].to_list())
+        assert years[0]  == YEAR_MIN, f"First year = {years[0]}, expected {YEAR_MIN}"
+        assert years[-1] == YEAR_MAX, f"Last year = {years[-1]}, expected {YEAR_MAX}"
+        assert years == list(range(YEAR_MIN, YEAR_MAX + 1)), \
+            "Year sequence in factor_trajectories has gaps"
+
+    def test_loadings_row_count(self, loadings, word_fits, meta):
+        # Loadings must equal meta n_words (degenerate words may have been dropped)
+        assert len(loadings) == meta["n_words"], (
+            f"factor_loadings has {len(loadings)} rows but meta.n_words = {meta['n_words']}"
+        )
+        # And it must be close to the Phase 4 word count (degenerate drops allowed)
+        n_fits = len(word_fits)
+        assert len(loadings) >= n_fits - 250, (
+            f"Too many words dropped: loadings={len(loadings)}, "
+            f"word_fits={n_fits} (allowed ≤250 degenerate drops)"
+        )
+
+    # ── c. Mathematical properties ────────────────────────────
+
+    def test_explained_variance_ordering(self, meta):
+        evr = meta["explained_variance_ratio"]
+        for i in range(len(evr) - 1):
+            assert evr[i] >= evr[i + 1] - 1e-9, (
+                f"EVR not descending: factor_{i+1}={evr[i]:.5f} < "
+                f"factor_{i+2}={evr[i+1]:.5f}"
+            )
+        total = sum(evr)
+        assert total <= 1.0 + 1e-6, f"EVR sum {total:.6f} > 1.0"
+        assert total > 0.0, "EVR sum is zero"
+
+    def test_trajectory_orthogonality(self, trajectories, meta):
+        """PCA scores are orthogonal: off-diagonal elements of F^T F should be
+        negligible relative to diagonal elements."""
+        n = meta["n_factors"]
+        factor_cols = [f"factor_{i + 1}" for i in range(n)]
+        F = trajectories.select(factor_cols).to_numpy()   # (209, k)
+        gram = F.T @ F                                      # (k, k)
+        diag = np.diag(gram)
+        off  = gram - np.diag(diag)
+        ratio = np.abs(off).max() / np.abs(diag).mean()
+        assert ratio < 0.01, (
+            f"Factor trajectories not orthogonal: "
+            f"max_off_diag / mean_diag = {ratio:.4f} (threshold: 0.01)"
+        )
+
+    def test_loading_unit_norms(self, loadings, meta):
+        """Each factor's loading vector should be unit-norm (PCA convention)."""
+        n = meta["n_factors"]
+        for i in range(n):
+            col  = f"factor_{i + 1}"
+            vals = loadings[col].to_numpy()
+            norm = float(np.sqrt((vals ** 2).sum()))
+            assert abs(norm - 1.0) < 1e-3, (
+                f"factor_{i+1} loading norm = {norm:.6f}, expected 1.0. "
+                "Loadings may have been scaled by singular values."
+            )
+
+    def test_factor1_dominates(self, meta):
+        evr = meta["explained_variance_ratio"]
+        assert evr[0] > evr[1], (
+            f"factor_1 EVR ({evr[0]:.4f}) ≤ factor_2 EVR ({evr[1]:.4f})"
+        )
+        assert evr[0] >= 0.02, (
+            f"factor_1 explains only {evr[0]:.2%} — suspiciously low. "
+            "Check that per-word standardization ran correctly."
+        )
+
+    def test_metadata_cumulative_variance_consistent(self, meta):
+        evr  = np.array(meta["explained_variance_ratio"])
+        cumv = np.array(meta["cumulative_variance"])
+        expected = np.cumsum(evr)
+        max_diff = np.abs(cumv - expected).max()
+        assert max_diff < 1e-7, (
+            f"cumulative_variance does not match cumsum(EVR): max diff = {max_diff:.2e}"
+        )
+        assert abs(meta["total_variance_explained"] - float(cumv[-1])) < 1e-7
+
+    # ── d. Historical / domain sanity ─────────────────────────
+
+    def test_war_warfare_correlated_loadings(self, loadings):
+        """'war' and 'warfare' have highly similar drift dynamics — they should
+        load on the same side of the dominant factor.
+        Note: vocabulary is limited to c/t/w shards, so 'battle' is unavailable."""
+        war_rows     = loadings.filter(pl.col("word") == "war")
+        warfare_rows = loadings.filter(pl.col("word") == "warfare")
+        assert len(war_rows) > 0,     "'war' not found in factor_loadings"
+        assert len(warfare_rows) > 0, "'warfare' not found in factor_loadings"
+        war_f1     = float(war_rows["factor_1"][0])
+        warfare_f1 = float(warfare_rows["factor_1"][0])
+        assert war_f1 * warfare_f1 > 0, (
+            f"'war' (f1={war_f1:.4f}) and 'warfare' (f1={warfare_f1:.4f}) "
+            "have opposite signs on factor_1 — military words should co-move"
+        )
+
+    def test_computer_era_cluster(self, loadings):
+        """Computer-era words should share the same directional loading on factor_1
+        — they all grew in frequency during the same historical period.
+        Note: vocabulary is limited to c/t/w shards, so candidates are
+        computer, computing, technology, wireless, television."""
+        tech_words = ["computer", "computing", "technology", "wireless", "television"]
+        present = [
+            w for w in tech_words
+            if loadings.filter(pl.col("word") == w).shape[0] > 0
+        ]
+        assert len(present) >= 3, (
+            f"Only {len(present)} tech words found in vocabulary: {present}. "
+            "Expected ≥3 of: computer, computing, technology, wireless, television"
+        )
+        signs = [
+            np.sign(float(loadings.filter(pl.col("word") == w)["factor_1"][0]))
+            for w in present
+        ]
+        dominant = max(
+            sum(1 for s in signs if s > 0),
+            sum(1 for s in signs if s < 0),
+        )
+        assert dominant >= 3, (
+            f"Computer-era words do not cluster on factor_1: "
+            f"signs = {list(zip(present, signs))}"
+        )
+
+    def test_factor1_captures_20th_century_variance(self, trajectories):
+        """Factor 1 drift should be more volatile during the WWI/WWII era
+        (1914–1945) than during the quieter late-Victorian era (1860–1895).
+        This test directly detects the bug of using latent_level instead of
+        latent_drift as the PCA signal."""
+        f1_all = trajectories.sort("year")
+        pre = f1_all.filter(
+            (pl.col("year") >= 1860) & (pl.col("year") <= 1895)
+        )["factor_1"].to_numpy()
+        war = f1_all.filter(
+            (pl.col("year") >= 1914) & (pl.col("year") <= 1945)
+        )["factor_1"].to_numpy()
+        var_pre = float(np.std(pre))
+        var_war = float(np.std(war))
+        assert var_war > var_pre, (
+            f"factor_1 std in 1914–1945 ({var_war:.4f}) ≤ 1860–1895 ({var_pre:.4f}). "
+            "This suggests latent_level (not latent_drift) was used as signal — "
+            "level has smoother dynamics in the war era than pre-war."
+        )
+
+    def test_metadata_signal_is_drift(self, meta):
+        assert meta["signal"] == "latent_drift", (
+            f"Expected signal='latent_drift', got '{meta['signal']}'"
+        )
+
+    def test_metadata_n_words_consistent(self, loadings, meta):
+        assert len(loadings) == meta["n_words"], (
+            f"factor_loadings has {len(loadings)} rows but meta['n_words']={meta['n_words']}"
         )
