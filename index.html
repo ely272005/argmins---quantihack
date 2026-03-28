@@ -678,6 +678,10 @@ async function addWord() {
   renderStats();
   setStatus('');
   addBtn.disabled = false;
+
+  // Try to load pipeline model data (silently skip if not available)
+  const modelData = await fetchModelData(raw);
+  if (modelData) renderModelPanel(modelData);
 }
 
 async function refreshAll() {
@@ -990,17 +994,7 @@ function renderModelPanel(data) {
   }
 }
 
-// Extend addWord to also fetch model data
-const _origAddWord = addWord;
-async function addWord() {
-  const raw = wordInput.value.trim().toLowerCase();
-  await _origAddWord();
-  // Only try model fetch if word was successfully added
-  if (words.find(w => w.word === raw)) {
-    const modelData = await fetchModelData(raw);
-    if (modelData) renderModelPanel(modelData);
-  }
-}
+// addWord is defined above; model fetch is handled inside it directly.
 
 // ── LII Dashboard ──────────────────────────────────────────────
 let dashLoaded = false;
