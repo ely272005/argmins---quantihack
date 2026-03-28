@@ -395,6 +395,31 @@
   .cat-economic   { color: #FFB74D; }
   .cat-technology { color: #CE93D8; }
 
+  /* ── Factor Explorer ─────────────────────────────────────── */
+  .factor-selector { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1rem; }
+  .factor-btn {
+    background: none; border: 1px solid var(--border2); border-radius: 4px;
+    color: var(--muted); font-family: var(--font-mono); font-size: 11px;
+    padding: 4px 10px; cursor: pointer; transition: color 0.15s, border-color 0.15s;
+  }
+  .factor-btn.active { border-color: var(--accent); color: var(--accent); }
+  .factor-btn:hover:not(.active) { color: var(--text); border-color: var(--border2); }
+  .factor-meta {
+    font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+    margin-bottom: 0.75rem;
+  }
+  .factor-words { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 0.5rem; }
+  .factor-word-chip {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 3px; color: var(--muted); font-family: var(--font-mono);
+    font-size: 11px; padding: 3px 8px; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .factor-word-chip:hover { color: var(--text); border-color: var(--border2); }
+
+  /* ── Word Map ────────────────────────────────────────────── */
+  .loading-msg { font-size: 11px; color: var(--muted); padding: 1rem 0; }
+
 </style>
 </head>
 <body>
@@ -412,6 +437,8 @@
   <nav class="tab-nav">
     <button class="tab-btn active" id="tab-explorer" onclick="showTab('explorer')">word explorer</button>
     <button class="tab-btn" id="tab-dashboard" onclick="showTab('dashboard')">instability dashboard</button>
+    <button class="tab-btn" id="tab-factors" onclick="showTab('factors')">factor explorer</button>
+    <button class="tab-btn" id="tab-wordmap" onclick="showTab('wordmap')">word map</button>
   </nav>
 
   <!-- ── Word Explorer section ───────────────────────── -->
@@ -501,6 +528,57 @@
     </div>
   </div><!-- end section-dashboard -->
 
+  <!-- ── Factor Explorer section ────────────────────────── -->
+  <div class="tab-section" id="section-factors">
+
+    <div class="section-title">Factor Explorer</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:1.5rem;">
+      Each factor captures a shared dynamic pattern across thousands of words.
+      Select a factor to see its trajectory and the words that load most strongly onto it.
+      Click any word chip to explore it in the word explorer.
+    </p>
+
+    <div id="factorLoading" class="loading-msg">
+      <span class="loading-dot">●</span> loading factor data…
+    </div>
+
+    <div id="factorContent" style="display:none;">
+      <div id="factorSelector" class="factor-selector"></div>
+      <div class="factor-meta" id="factorMeta"></div>
+      <div class="chart-wrap" style="margin-bottom:1.5rem;">
+        <canvas id="factorChart"></canvas>
+      </div>
+      <div class="section-title" style="margin-top:1.5rem; font-size:12px;">Top-Loading Words</div>
+      <p style="font-size:11px;color:var(--muted);margin:0.25rem 0 0.75rem;">
+        Words with the strongest association to this factor. Click to explore.
+      </p>
+      <div id="factorWords" class="factor-words"></div>
+    </div>
+
+  </div><!-- end section-factors -->
+
+  <!-- ── Word Map section ────────────────────────────────── -->
+  <div class="tab-section" id="section-wordmap">
+
+    <div class="section-title">Dynamic Word Map</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:1.5rem;">
+      Words positioned by their Factor&nbsp;1 × Factor&nbsp;2 loading — revealing clusters of
+      shared linguistic dynamics, not semantic similarity. Colored by dominant regime.
+      Click any word to explore it.
+    </p>
+
+    <div id="wordmapLoading" class="loading-msg">
+      <span class="loading-dot">●</span> loading word map…
+    </div>
+
+    <div id="wordmapContent" style="display:none;">
+      <div class="chart-wrap">
+        <canvas id="wordMapChart"></canvas>
+      </div>
+    </div>
+
+  </div><!-- end section-wordmap -->
+
 </main>
 
 <script>
@@ -511,6 +589,8 @@ function showTab(name) {
   document.getElementById('section-' + name).classList.add('active');
   document.getElementById('tab-' + name).classList.add('active');
   if (name === 'dashboard' && !dashLoaded) loadDashboard();
+  if (name === 'factors'   && !factorsLoaded) loadFactors();
+  if (name === 'wordmap'   && !wordmapLoaded) loadWordMap();
 }
 
 // ── Main constants ─────────────────────────────────────────────
@@ -816,10 +896,33 @@ function renderModelPanel(data) {
     tension: 0.3,
   };
 
+  // ±instability band around latent level
+  const upperBandDataset = {
+    label: '±instab',
+    data: data.years.map((yr, i) =>
+      data.level[i] != null && data.instab[i] != null
+        ? { x: yr, y: data.level[i] + data.instab[i] } : { x: yr, y: null }),
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(200,184,154,0.08)',
+    fill: '+1',
+    pointRadius: 0,
+    tension: 0.3,
+  };
+  const lowerBandDataset = {
+    label: '',
+    data: data.years.map((yr, i) =>
+      data.level[i] != null && data.instab[i] != null
+        ? { x: yr, y: data.level[i] - data.instab[i] } : { x: yr, y: null }),
+    borderColor: 'transparent',
+    fill: false,
+    pointRadius: 0,
+    tension: 0.3,
+  };
+
   const canvas = document.getElementById('modelChart');
   modelChartInstance = new Chart(canvas, {
     type: 'line',
-    data: { datasets: [levelDataset, ...regimeDatasets] },
+    data: { datasets: [upperBandDataset, lowerBandDataset, levelDataset, ...regimeDatasets] },
     options: {
       responsive: true,
       maintainAspectRatio: true,
@@ -1082,6 +1185,214 @@ function renderEventTable(alignData) {
       <td class="${ev.aligned ? 'aligned-yes' : 'aligned-no'}">${ev.aligned ? '✓ yes' : '✗ no'}</td>
     </tr>
   `).join('');
+}
+
+// ── Factor Explorer ────────────────────────────────────────────
+let factorsLoaded = false, factorChartInstance = null;
+let factorData = null, evalSummaryData = null;
+
+async function loadFactors() {
+  try {
+    [factorData, evalSummaryData] = await Promise.all([
+      fetch(`${PROXY}/api/factors`).then(r => r.json()),
+      fetch(`${PROXY}/outputs/eval_summary.json`).then(r => r.json()),
+    ]);
+    factorsLoaded = true;
+    document.getElementById('factorLoading').style.display = 'none';
+    document.getElementById('factorContent').style.display = 'block';
+    buildFactorSelector();
+    renderFactorChart(1);
+  } catch(e) {
+    document.getElementById('factorLoading').textContent = 'failed to load factor data';
+  }
+}
+
+function buildFactorSelector() {
+  const container = document.getElementById('factorSelector');
+  container.innerHTML = '';
+  for (let i = 1; i <= 10; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'factor-btn' + (i === 1 ? ' active' : '');
+    btn.textContent = `f${i}`;
+    btn.onclick = () => renderFactorChart(i);
+    container.appendChild(btn);
+  }
+}
+
+function renderFactorChart(n) {
+  document.querySelectorAll('.factor-btn').forEach((b, i) =>
+    b.classList.toggle('active', i + 1 === n));
+
+  const key       = `f${n}`;
+  const factorKey = `factor_${n}`;
+  const evr       = evalSummaryData?.factor_interpretability?.[factorKey]?.explained_variance ?? 0;
+  document.getElementById('factorMeta').textContent =
+    `Factor ${n}  ·  ${(100 * evr).toFixed(1)}% of total variance explained`;
+
+  const years = factorData.map(r => r.year);
+  const vals  = factorData.map(r => r[key] ?? null);
+
+  if (factorChartInstance) factorChartInstance.destroy();
+  const canvas = document.getElementById('factorChart');
+  factorChartInstance = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: years,
+      datasets: [{
+        label: `Factor ${n}`,
+        data: vals,
+        borderColor: 'var(--accent2)',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.3,
+        fill: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      aspectRatio: 3,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e21',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#f0ede8',
+          bodyColor: '#7a7875',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 10 },
+          callbacks: { label: ctx => ` f${n}: ${ctx.parsed.y.toFixed(4)}` }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 12 },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        },
+        y: {
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 5 },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        }
+      }
+    }
+  });
+
+  // Top-loading words
+  const topWords = evalSummaryData?.factor_interpretability?.[factorKey]?.top_words ?? [];
+  const wordsContainer = document.getElementById('factorWords');
+  wordsContainer.innerHTML = topWords.map(w =>
+    `<span class="factor-word-chip" onclick="jumpToWord('${w}')">${w}</span>`
+  ).join('');
+}
+
+function jumpToWord(word) {
+  wordInput.value = word;
+  showTab('explorer');
+  addWord();
+}
+
+// ── Word Map ───────────────────────────────────────────────────
+let wordmapLoaded = false, wordMapChartInstance = null;
+
+const MAP_REGIME_COLORS = {
+  adoption:  'rgba(168,200,160,0.75)',
+  decline:   'rgba(200,120,120,0.75)',
+  turbulent: 'rgba(255,183,77,0.75)',
+  stable:    'rgba(143,168,200,0.55)',
+};
+
+async function loadWordMap() {
+  try {
+    const data = await fetch(`${PROXY}/api/word-map`).then(r => r.json());
+    wordmapLoaded = true;
+    document.getElementById('wordmapLoading').style.display = 'none';
+    document.getElementById('wordmapContent').style.display = 'block';
+    renderWordMap(data);
+  } catch(e) {
+    document.getElementById('wordmapLoading').textContent = 'failed to load word map';
+  }
+}
+
+function renderWordMap(data) {
+  const byRegime = { adoption: [], decline: [], turbulent: [], stable: [] };
+  for (const row of data) {
+    const r = row.regime in byRegime ? row.regime : 'stable';
+    byRegime[r].push({ x: row.f1, y: row.f2, word: row.word, peak: row.peak, ncp: row.ncp });
+  }
+
+  const datasets = Object.entries(byRegime).map(([regime, pts]) => ({
+    label: regime,
+    data: pts,
+    backgroundColor: MAP_REGIME_COLORS[regime],
+    pointRadius: 4,
+    pointHoverRadius: 7,
+  }));
+
+  if (wordMapChartInstance) wordMapChartInstance.destroy();
+  const canvas = document.getElementById('wordMapChart');
+  wordMapChartInstance = new Chart(canvas, {
+    type: 'scatter',
+    data: { datasets },
+    options: {
+      responsive: true,
+      aspectRatio: 1.6,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#7a7875',
+            font: { family: 'DM Mono', size: 10 },
+            boxWidth: 10,
+            padding: 16,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#1e1e21',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#f0ede8',
+          bodyColor: '#7a7875',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 10 },
+          callbacks: {
+            title: items => items[0].raw.word,
+            label: ctx => {
+              const p = ctx.raw;
+              return [
+                ` f1: ${p.x.toFixed(4)}  f2: ${p.y.toFixed(4)}`,
+                ` peak: ${p.peak ?? '?'}  ncp: ${p.ncp}`,
+              ];
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Factor 1 loading', color: '#7a7875',
+                   font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        },
+        y: {
+          title: { display: true, text: 'Factor 2 loading', color: '#7a7875',
+                   font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        }
+      },
+      onClick(evt) {
+        const elements = wordMapChartInstance.getElementsAtEventForMode(
+          evt, 'nearest', { intersect: true }, false);
+        if (!elements.length) return;
+        const el  = elements[0];
+        const pt  = wordMapChartInstance.data.datasets[el.datasetIndex].data[el.index];
+        jumpToWord(pt.word);
+      }
+    }
+  });
 }
 </script>
 </body>

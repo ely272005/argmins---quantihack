@@ -37,6 +37,9 @@ OUTPUTS_EVENTS_JSON  = "outputs/events.json"
 OUTPUTS_WORD_INDEX   = "outputs/word_index.json"
 OUTPUTS_WORDS_DIR    = "outputs/words"
 EVAL_SUMMARY         = "outputs/eval_summary.json"
+WORD_MAP_JSON        = "outputs/word_map.json"
+INDEX_HTML           = "index.html"
+SERVER_JS            = "server.js"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -1578,3 +1581,108 @@ class TestPhase11Eval:
         assert corr is not None, "cp_lii_correlation is None"
         assert isinstance(corr, float), f"cp_lii_correlation is not a float: {corr!r}"
         assert math.isfinite(corr), f"cp_lii_correlation={corr} is not finite"
+
+
+# ── Phase 12: Demo and Presentation Layer ─────────────────────
+class TestPhase12Demo:
+    """12 tests verifying word_map.json, index.html tabs, and server.js endpoint."""
+
+    ANCHOR_WORDS_12 = ["war", "computer", "technology", "wireless"]
+
+    # ── Fixture ───────────────────────────────────────────────
+
+    @pytest.fixture(scope="class")
+    def word_map(self):
+        import json
+        with open(WORD_MAP_JSON) as f:
+            return json.load(f)
+
+    # ── a. word_map.json schema (5 tests) ─────────────────────
+
+    def test_word_map_exists(self):
+        """outputs/word_map.json must exist."""
+        assert os.path.exists(WORD_MAP_JSON), f"Missing: {WORD_MAP_JSON}"
+
+    def test_word_map_min_entries(self, word_map):
+        """word_map.json must have at least 100 entries."""
+        assert len(word_map) >= 100, (
+            f"word_map has {len(word_map)} entries — expected ≥ 100"
+        )
+
+    def test_word_map_schema(self, word_map):
+        """Every entry must have keys: word, f1, f2, regime, peak, ncp."""
+        required = {"word", "f1", "f2", "regime", "peak", "ncp"}
+        for entry in word_map[:20]:   # spot-check first 20
+            missing = required - set(entry.keys())
+            assert not missing, f"word_map entry missing keys {missing}: {entry}"
+
+    def test_word_map_f1_spread(self, word_map):
+        """std(f1 values) must be > 0 — entries must have genuine spread (not all identical)."""
+        import statistics
+        f1_vals = [e["f1"] for e in word_map if e["f1"] is not None]
+        assert len(f1_vals) >= 10, "too few finite f1 values"
+        std = statistics.stdev(f1_vals)
+        assert std > 0, f"f1 std={std:.8f} — word_map has no spread on Factor 1 axis"
+
+    def test_word_map_regime_valid(self, word_map):
+        """Every regime value must be one of the four valid labels."""
+        valid = {"adoption", "decline", "turbulent", "stable"}
+        bad = [e["regime"] for e in word_map if e["regime"] not in valid]
+        assert not bad, f"Invalid regimes in word_map: {set(bad)}"
+
+    # ── b. Anchor word coverage (2 tests) ─────────────────────
+
+    def test_anchor_words_in_word_map(self, word_map):
+        """All anchor words must appear in word_map (always-included guarantee)."""
+        words_in_map = {e["word"] for e in word_map}
+        missing = [w for w in self.ANCHOR_WORDS_12 if w not in words_in_map]
+        assert not missing, f"Anchor words missing from word_map: {missing}"
+
+    def test_word_map_f1_finite(self, word_map):
+        """All f1 values must be finite floats."""
+        import math
+        bad = [e for e in word_map if e["f1"] is None or not math.isfinite(e["f1"])]
+        assert not bad, f"{len(bad)} entries have non-finite f1 values"
+
+    # ── c. index.html structure (3 tests) ─────────────────────
+
+    def test_factor_tab_in_html(self):
+        """index.html must include the factor explorer tab."""
+        with open(INDEX_HTML) as f:
+            html = f.read()
+        assert "showTab('factors')" in html, (
+            "showTab('factors') not found in index.html — factor tab missing"
+        )
+
+    def test_wordmap_tab_in_html(self):
+        """index.html must include the word map tab."""
+        with open(INDEX_HTML) as f:
+            html = f.read()
+        assert "showTab('wordmap')" in html, (
+            "showTab('wordmap') not found in index.html — word map tab missing"
+        )
+
+    def test_chart_canvases_in_html(self):
+        """index.html must have both factorChart and wordMapChart canvas elements."""
+        with open(INDEX_HTML) as f:
+            html = f.read()
+        assert 'id="factorChart"' in html,  "factorChart canvas not found in index.html"
+        assert 'id="wordMapChart"' in html, "wordMapChart canvas not found in index.html"
+
+    # ── d. server.js (2 tests) ────────────────────────────────
+
+    def test_word_map_api_endpoint(self):
+        """server.js must define the /api/word-map endpoint."""
+        with open(SERVER_JS) as f:
+            js = f.read()
+        assert "'/api/word-map'" in js or '"/api/word-map"' in js, (
+            "/api/word-map endpoint not found in server.js"
+        )
+
+    def test_word_map_json_loadable(self):
+        """server.js must reference word_map.json in its file loading logic."""
+        with open(SERVER_JS) as f:
+            js = f.read()
+        assert "word_map.json" in js, (
+            "'word_map.json' not found in server.js"
+        )

@@ -11,6 +11,7 @@ Outputs (to outputs/):
   outputs/event_alignment.json      — Event alignment metrics (copy)
   outputs/word_index.json           — Word summary index (~70k words)
   outputs/words/{word}.json         — Per-word detail (top N_WORDS by frequency)
+  outputs/word_map.json             — Top N_MAP words for 2D factor scatter map
 
 JSON formats:
   lii.json         → [{year, lii, cr, bvn, fallback}, ...]   (null for missing years)
@@ -50,16 +51,19 @@ SUMMARY_PATH    = os.path.join(PROCESSED_DIR, "word_summary_metrics.parquet")
 FITS_PATH       = os.path.join(PROCESSED_DIR, "word_level_fits.parquet")
 REGIMES_PATH    = os.path.join(PROCESSED_DIR, "regimes.parquet")
 CP_PATH         = os.path.join(PROCESSED_DIR, "changepoints.parquet")
+LOADINGS_PATH   = os.path.join(PROCESSED_DIR, "factor_loadings.parquet")
 
 # Outputs
-LII_OUT     = os.path.join(OUTPUTS_DIR, "lii.json")
-DENSITY_OUT = os.path.join(OUTPUTS_DIR, "changepoint_density.json")
-FACTORS_OUT = os.path.join(OUTPUTS_DIR, "factor_trajectories.json")
-EVENTS_OUT  = os.path.join(OUTPUTS_DIR, "events.json")
-ALIGN_OUT   = os.path.join(OUTPUTS_DIR, "event_alignment.json")
-INDEX_OUT   = os.path.join(OUTPUTS_DIR, "word_index.json")
+LII_OUT       = os.path.join(OUTPUTS_DIR, "lii.json")
+DENSITY_OUT   = os.path.join(OUTPUTS_DIR, "changepoint_density.json")
+FACTORS_OUT   = os.path.join(OUTPUTS_DIR, "factor_trajectories.json")
+EVENTS_OUT    = os.path.join(OUTPUTS_DIR, "events.json")
+ALIGN_OUT     = os.path.join(OUTPUTS_DIR, "event_alignment.json")
+INDEX_OUT     = os.path.join(OUTPUTS_DIR, "word_index.json")
+WORD_MAP_OUT  = os.path.join(OUTPUTS_DIR, "word_map.json")
 
 N_WORDS   = 500    # per-word JSON files to generate (top by mean_instability)
+N_MAP     = 500    # words for 2D factor scatter map (top by Euclidean factor distance)
 N_FACTORS = 10
 YEAR_MIN  = 1800
 YEAR_MAX  = 2008
@@ -319,6 +323,85 @@ def export_per_word(
     return written
 
 
+def export_word_map(
+    loadings_path: str,
+    summary_path: str,
+    regimes_path: str,
+    cp_path: str,
+    out_path: str,
+    n_map: int = N_MAP,
+) -> int:
+    """Export top n_map words by factor spread for the 2D word map scatter.
+
+    Selects words by Euclidean distance from origin in (factor_1, factor_2)
+    space — words with high |f1| or |f2| are the most interpretable on the map.
+    Always includes ANCHOR_WORDS regardless of ranking.
+
+    Returns number of records written.
+    """
+    loadings = pl.read_parquet(loadings_path, columns=["word", "factor_1", "factor_2"])
+
+    # Score = sqrt(f1^2 + f2^2)
+    loadings = loadings.with_columns(
+        (pl.col("factor_1").pow(2) + pl.col("factor_2").pow(2)).sqrt().alias("_score")
+    )
+    top_df   = loadings.sort("_score", descending=True).head(n_map)
+    vocab    = set(loadings["word"].to_list())
+    top_words = set(top_df["word"].to_list()) | (ANCHOR_WORDS & vocab)
+
+    # Dominant regime (only load the words we need)
+    dom_regime = (
+        pl.read_parquet(regimes_path, columns=["word", "regime_label"])
+        .filter(pl.col("word").is_in(top_words))
+        .group_by(["word", "regime_label"])
+        .len()
+        .sort("len", descending=True)
+        .unique(["word"], keep="first")
+        .select(["word", "regime_label"])
+        .rename({"regime_label": "regime"})
+    )
+
+    # CP count
+    cp_counts = (
+        pl.read_parquet(cp_path, columns=["word", "changepoint_year"])
+        .filter(pl.col("word").is_in(top_words))
+        .group_by("word")
+        .len()
+        .rename({"len": "ncp"})
+    )
+
+    # Peak year
+    summary = pl.read_parquet(summary_path, columns=["word", "peak_year"])
+
+    joined = (
+        loadings.filter(pl.col("word").is_in(top_words))
+        .select(["word", "factor_1", "factor_2"])
+        .join(summary, on="word", how="left")
+        .join(dom_regime, on="word", how="left")
+        .join(cp_counts, on="word", how="left")
+        .with_columns([
+            pl.col("ncp").fill_null(0),
+            pl.col("regime").fill_null("stable"),
+        ])
+    )
+
+    records = []
+    for row in joined.iter_rows(named=True):
+        records.append({
+            "word":   row["word"],
+            "f1":     round(float(row["factor_1"]), 6),
+            "f2":     round(float(row["factor_2"]), 6),
+            "regime": row["regime"],
+            "peak":   int(row["peak_year"]) if row["peak_year"] is not None else None,
+            "ncp":    int(row["ncp"]),
+        })
+
+    with open(out_path, "w") as f:
+        json.dump(records, f, separators=(",", ":"))
+
+    return len(records)
+
+
 # ── Main ───────────────────────────────────────────────────────
 
 def main() -> None:
@@ -372,9 +455,9 @@ def main() -> None:
     sz = os.path.getsize(INDEX_OUT)
     print(f"  {n:,} words written  ({sz / 1024 / 1024:.1f} MB)")
 
-    # ── [6/6] Per-word JSON files ─────────────────────────────
+    # ── [6/7] Per-word JSON files ─────────────────────────────
     if not args.skip_words:
-        print(f"\n[6/6] Exporting per-word JSON files (top {args.n_words}) …")
+        print(f"\n[6/7] Exporting per-word JSON files (top {args.n_words}) …")
         t6 = time.time()
         written = export_per_word(
             SUMMARY_PATH, FITS_PATH, REGIMES_PATH, CP_PATH,
@@ -384,7 +467,13 @@ def main() -> None:
         total_kb = sum(os.path.getsize(os.path.join(WORDS_DIR, f)) for f in files) / 1024
         print(f"  {written} files written  (total: {total_kb:.0f} KB)  [{time.time() - t6:.1f}s]")
     else:
-        print(f"\n[6/6] Skipping per-word export (--skip-words)")
+        print(f"\n[6/7] Skipping per-word export (--skip-words)")
+
+    # ── [7/7] Word map for 2D factor scatter ─────────────────
+    print(f"\n[7/7] Exporting word map → {WORD_MAP_OUT} …")
+    n = export_word_map(LOADINGS_PATH, SUMMARY_PATH, REGIMES_PATH, CP_PATH, WORD_MAP_OUT)
+    sz = os.path.getsize(WORD_MAP_OUT)
+    print(f"  {n} words written  ({sz / 1024:.1f} KB)")
 
     elapsed = time.time() - t0
     print(f"\nPhase 10 complete.  Total time: {elapsed:.1f}s")
