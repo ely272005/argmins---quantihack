@@ -1,5 +1,6 @@
 """
-Sanity tests for Phase 2 (clean), Phase 3 (smooth), and Phase 4 (word model) outputs.
+Sanity tests for Phase 2 (clean), Phase 3 (smooth), Phase 4 (word model),
+Phase 5 (changepoints), and Phase 6 (regime labeling) outputs.
 
 Run with:
     source venv/bin/activate
@@ -14,11 +15,14 @@ import polars as pl
 import pytest
 
 # ── Paths ─────────────────────────────────────────────────────
-CLEAN_PANEL  = "data/processed/clean_panel.parquet"
-VOCAB_META   = "data/processed/vocabulary_metadata.parquet"
-SMOOTHED     = "data/processed/smoothed_word_series.parquet"
-WORD_FITS    = "data/processed/word_level_fits.parquet"
-WORD_SUMMARY = "data/processed/word_summary_metrics.parquet"
+CLEAN_PANEL   = "data/processed/clean_panel.parquet"
+VOCAB_META    = "data/processed/vocabulary_metadata.parquet"
+SMOOTHED      = "data/processed/smoothed_word_series.parquet"
+WORD_FITS     = "data/processed/word_level_fits.parquet"
+WORD_SUMMARY  = "data/processed/word_summary_metrics.parquet"
+CHANGEPOINTS  = "data/processed/changepoints.parquet"
+DENSITY       = "data/processed/changepoint_density.parquet"
+REGIMES       = "data/processed/regimes.parquet"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -521,3 +525,178 @@ class TestPhase5Density:
             val = row["n_changepoints"][0]
             assert val > median_density, \
                 f"Year {yr} has n_changepoints={val} <= median={median_density}"
+
+
+# ── Phase 6: Regime Labeling ──────────────────────────────────────────────────
+
+class TestPhase6Regimes:
+    """Validates data/processed/regimes.parquet produced by pipeline/06_regimes.py."""
+
+    VALID_LABELS = {"adoption", "decline", "turbulent", "stable"}
+
+    @pytest.fixture(scope="class")
+    def regimes(self):
+        return pl.read_parquet(REGIMES)
+
+    @pytest.fixture(scope="class")
+    def word_fits(self):
+        return pl.read_parquet(WORD_FITS)
+
+    @pytest.fixture(scope="class")
+    def changepoints(self):
+        return pl.read_parquet(CHANGEPOINTS)
+
+    # ── Structural tests ──────────────────────────────────────
+
+    def test_file_exists(self):
+        assert os.path.isfile(REGIMES), f"Missing: {REGIMES}"
+
+    def test_schema(self, regimes):
+        required = {"word", "year", "regime_label", "z_drift", "z_instability"}
+        missing = required - set(regimes.columns)
+        assert len(missing) == 0, f"Missing columns: {missing}"
+
+    def test_no_nulls_in_core_columns(self, regimes):
+        for col in ["word", "year", "regime_label", "z_drift", "z_instability"]:
+            n = regimes[col].null_count()
+            assert n == 0, f"Column '{col}' has {n} null values"
+
+    def test_labels_are_valid(self, regimes):
+        actual = set(regimes["regime_label"].unique().to_list())
+        unexpected = actual - self.VALID_LABELS
+        assert len(unexpected) == 0, f"Unexpected regime labels: {unexpected}"
+
+    # ── Shape / uniqueness tests ──────────────────────────────
+
+    def test_shape_matches_word_level_fits(self, regimes, word_fits):
+        assert len(regimes) == len(word_fits), (
+            f"regimes has {len(regimes):,} rows, "
+            f"word_level_fits has {len(word_fits):,}"
+        )
+        assert regimes["word"].n_unique() == word_fits["word"].n_unique(), (
+            "Word count mismatch between regimes and word_level_fits"
+        )
+
+    def test_no_duplicate_word_year(self, regimes):
+        dupes = (
+            regimes.group_by(["word", "year"])
+                   .agg(pl.len().alias("n"))
+                   .filter(pl.col("n") > 1)
+        )
+        assert len(dupes) == 0, f"{len(dupes)} duplicate (word, year) pairs found"
+
+    def test_all_words_present(self, regimes, word_fits):
+        regime_words = set(regimes["word"].unique().to_list())
+        fits_words   = set(word_fits["word"].unique().to_list())
+        missing = fits_words - regime_words
+        assert len(missing) == 0, (
+            f"{len(missing)} words in word_level_fits missing from regimes: "
+            f"{sorted(missing)[:5]}"
+        )
+
+    def test_year_range(self, regimes):
+        assert regimes["year"].min() == YEAR_MIN
+        assert regimes["year"].max() == YEAR_MAX
+
+    # ── Distribution tests ────────────────────────────────────
+
+    def test_all_four_regimes_present_and_non_degenerate(self, regimes):
+        """All four labels must be present; none < 3% or > 80%."""
+        n = len(regimes)
+        counts = (
+            regimes.group_by("regime_label")
+                   .agg(pl.len().alias("n"))
+        )
+        labels_found = set(counts["regime_label"].to_list())
+        assert labels_found == self.VALID_LABELS, (
+            f"Not all four regimes present: found {labels_found}"
+        )
+        for row in counts.iter_rows(named=True):
+            frac = row["n"] / n
+            assert frac >= 0.03, (
+                f"Regime '{row['regime_label']}' is degenerate: {frac:.1%}"
+            )
+            assert frac <= 0.80, (
+                f"Regime '{row['regime_label']}' dominates: {frac:.1%}"
+            )
+
+    # ── Numerical quality tests ───────────────────────────────
+
+    def test_z_scores_are_finite(self, regimes):
+        """z_drift and z_instability must not contain Inf or IEEE NaN."""
+        for col in ["z_drift", "z_instability"]:
+            n_inf = regimes.filter(pl.col(col).is_infinite()).shape[0]
+            assert n_inf == 0, f"Column '{col}' has {n_inf} infinite values"
+        for col in ["z_drift", "z_instability"]:
+            n_nan = regimes.filter(pl.col(col).is_nan()).shape[0]
+            assert n_nan == 0, \
+                f"Column '{col}' has {n_nan} IEEE NaN values (distinct from null)"
+
+    # ── Historical sanity tests ───────────────────────────────
+
+    def test_computer_adoption_1940_1980(self, regimes):
+        """'computer' should be adoption for the majority of years 1940–1980
+        (z_drift for computer is 7–15 in this era, comfortably above threshold)."""
+        sub = regimes.filter(
+            (pl.col("word") == "computer") &
+            (pl.col("year") >= 1940) &
+            (pl.col("year") <= 1980)
+        )
+        assert len(sub) > 0, "'computer' not found in regimes"
+        n_adoption = sub.filter(pl.col("regime_label") == "adoption").shape[0]
+        frac = n_adoption / len(sub)
+        assert frac >= 0.50, (
+            f"Expected ≥50% adoption for 'computer' 1940-1980, got {frac:.1%}"
+        )
+
+    def test_telegraph_decline_1941_1980(self, regimes):
+        """'telegraph' should be decline for the majority of years 1941–1980
+        (technology obsolescence after telephone/radio displaced it)."""
+        sub = regimes.filter(
+            (pl.col("word") == "telegraph") &
+            (pl.col("year") >= 1941) &
+            (pl.col("year") <= 1980)
+        )
+        assert len(sub) > 0, "'telegraph' not found in regimes"
+        n_decline = sub.filter(pl.col("regime_label") == "decline").shape[0]
+        frac = n_decline / len(sub)
+        assert frac >= 0.50, (
+            f"Expected ≥50% decline for 'telegraph' 1941-1980, got {frac:.1%}"
+        )
+
+    def test_cholera_adoption_1820_1870(self, regimes):
+        """'cholera' should be strongly adoption 1820–1870, matching 19th-century
+        epidemic waves that drove the word into widespread use."""
+        sub = regimes.filter(
+            (pl.col("word") == "cholera") &
+            (pl.col("year") >= 1820) &
+            (pl.col("year") <= 1870)
+        )
+        assert len(sub) > 0, "'cholera' not found in regimes"
+        n_adoption = sub.filter(pl.col("regime_label") == "adoption").shape[0]
+        frac = n_adoption / len(sub)
+        assert frac >= 0.80, (
+            f"Expected ≥80% adoption for 'cholera' 1820-1870, got {frac:.1%}"
+        )
+
+    def test_changepoint_proximity_raises_turbulent_rate(self, regimes, changepoints):
+        """Rows within ±3 years of any changepoint should have a higher turbulent
+        fraction than rows far from changepoints."""
+        PROX = 3
+        frames = [
+            changepoints.select(["word", pl.col("changepoint_year").alias("year")])
+                        .with_columns((pl.col("year") + offset).alias("year"))
+            for offset in range(-PROX, PROX + 1)
+        ]
+        cp_set = pl.concat(frames).unique()
+
+        near = regimes.join(cp_set, on=["word", "year"], how="semi")
+        far  = regimes.join(cp_set, on=["word", "year"], how="anti")
+
+        turb_near = near.filter(pl.col("regime_label") == "turbulent").shape[0] / len(near)
+        turb_far  = far.filter(pl.col("regime_label") == "turbulent").shape[0] / len(far)
+
+        assert turb_near > turb_far, (
+            f"Turbulent rate near changepoints ({turb_near:.3f}) is not greater "
+            f"than baseline ({turb_far:.3f})"
+        )
