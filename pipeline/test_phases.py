@@ -26,6 +26,7 @@ REGIMES              = "data/processed/regimes.parquet"
 FACTOR_TRAJECTORIES  = "data/processed/factor_trajectories.parquet"
 FACTOR_LOADINGS      = "data/processed/factor_loadings.parquet"
 FACTOR_METADATA_JSON = "data/processed/factor_metadata.json"
+LII_INDEX            = "data/processed/language_instability_index.parquet"
 
 YEAR_MIN = 1800
 YEAR_MAX = 2008
@@ -917,4 +918,162 @@ class TestPhase7FactorModel:
     def test_metadata_n_words_consistent(self, loadings, meta):
         assert len(loadings) == meta["n_words"], (
             f"factor_loadings has {len(loadings)} rows but meta['n_words']={meta['n_words']}"
+        )
+
+
+# ══════════════════════════════════════════════════════════════
+# Phase 8 — language_instability_index.parquet
+# ══════════════════════════════════════════════════════════════
+
+class TestPhase8LII:
+    """15 tests for the Language Instability Index output from Phase 8.
+
+    Verified data properties (from actual run):
+      - 209 rows (1800–2008), 204 valid (5 null: years 1800–1804)
+      - LII range: [1.763, 78.889], peak year: 1987
+      - CR range: [0.581, 0.980]
+      - Mean LII 1860–1895 ≈ 4.26, mean LII 1914–1945 ≈ 10.40,
+        mean LII 1970–2008 ≈ 66.83
+    """
+
+    @pytest.fixture(scope="class")
+    def lii(self):
+        return pl.read_parquet(LII_INDEX)
+
+    # ── (a) Structural ─────────────────────────────────────────
+
+    def test_file_exists(self):
+        assert os.path.isfile(LII_INDEX), f"Missing: {LII_INDEX}"
+
+    def test_schema(self, lii):
+        expected = {
+            "year", "lii_value", "concentration_ratio",
+            "top_eigenvalue", "broad_vs_narrow_score", "lii_fallback",
+        }
+        assert set(lii.columns) == expected, (
+            f"Unexpected columns: {set(lii.columns) ^ expected}"
+        )
+
+    # ── (b) Shape ──────────────────────────────────────────────
+
+    def test_exactly_209_rows(self, lii):
+        assert len(lii) == 209, f"Expected 209 rows, got {len(lii)}"
+
+    def test_year_range(self, lii):
+        assert int(lii["year"].min()) == 1800
+        assert int(lii["year"].max()) == 2008
+
+    def test_no_duplicate_years(self, lii):
+        assert lii["year"].n_unique() == 209, "Duplicate years found"
+
+    # ── (c) Null / valid-value pattern ────────────────────────
+
+    def test_null_pattern(self, lii):
+        """Exactly the first MIN_PERIODS (5) years should have null lii_value."""
+        null_years = (
+            lii.filter(pl.col("lii_value").is_null())["year"].sort().to_list()
+        )
+        assert null_years == list(range(1800, 1805)), (
+            f"Unexpected null years: {null_years}"
+        )
+
+    def test_sufficient_valid_rows(self, lii):
+        n_valid = lii.filter(pl.col("lii_value").is_not_null()).shape[0]
+        assert n_valid >= 200, f"Too few valid LII rows: {n_valid}"
+
+    # ── (d) Mathematical properties ───────────────────────────
+
+    def test_lii_value_nonnegative(self, lii):
+        valid = lii.filter(pl.col("lii_value").is_not_null())
+        neg = valid.filter(pl.col("lii_value") < 0)
+        assert len(neg) == 0, f"{len(neg)} rows have negative lii_value"
+
+    def test_concentration_ratio_in_range(self, lii):
+        valid = lii.filter(pl.col("concentration_ratio").is_not_null())
+        out = valid.filter(
+            (pl.col("concentration_ratio") <= 0) | (pl.col("concentration_ratio") > 1.0)
+        )
+        assert len(out) == 0, (
+            f"{len(out)} rows have CR outside (0, 1]: "
+            f"{valid['concentration_ratio'].min():.4f} – {valid['concentration_ratio'].max():.4f}"
+        )
+
+    def test_top_eigenvalue_lte_lii(self, lii):
+        """Top eigenvalue must not exceed trace(Σ) — it is one of its summands."""
+        valid = lii.filter(
+            pl.col("lii_value").is_not_null() & pl.col("top_eigenvalue").is_not_null()
+        )
+        violations = valid.filter(
+            pl.col("top_eigenvalue") > pl.col("lii_value") + 1e-9
+        )
+        assert len(violations) == 0, (
+            f"{len(violations)} rows where top_eigenvalue > lii_value"
+        )
+
+    def test_broad_vs_narrow_consistency(self, lii):
+        """broad_vs_narrow_score must equal 1 - concentration_ratio (within 1e-9)."""
+        valid = lii.filter(
+            pl.col("broad_vs_narrow_score").is_not_null()
+            & pl.col("concentration_ratio").is_not_null()
+        )
+        max_err = float(
+            valid.select(
+                ((pl.col("broad_vs_narrow_score") - (1.0 - pl.col("concentration_ratio"))).abs())
+                .alias("err")
+            )["err"].max()
+        )
+        assert max_err < 1e-9, f"broad_vs_narrow ≠ 1-CR: max_err={max_err:.2e}"
+
+    def test_lii_fallback_nonnegative(self, lii):
+        valid = lii.filter(pl.col("lii_fallback").is_not_null())
+        neg = valid.filter(pl.col("lii_fallback") < 0)
+        assert len(neg) == 0, f"{len(neg)} rows have negative lii_fallback"
+
+    # ── (e) Historical / domain sanity ────────────────────────
+
+    def test_lii_peak_not_at_boundary(self, lii):
+        """LII peak should not be at the extreme boundary years."""
+        valid = lii.filter(pl.col("lii_value").is_not_null())
+        peak_year = int(valid.sort("lii_value", descending=True)["year"][0])
+        assert peak_year not in (1800, 2008), (
+            f"LII peak at boundary year {peak_year} — suggests edge artefact"
+        )
+
+    def test_war_era_more_turbulent_than_pre_war(self, lii):
+        """Mean LII 1914–1945 should exceed mean LII 1860–1895.
+
+        Even though the absolute peak is post-1945 (PC era), the WWI/WWII
+        period has measurably higher instability than the quieter Victorian era.
+        Verified values: 1914–1945 mean ≈ 10.4, 1860–1895 mean ≈ 4.3.
+        """
+        valid = lii.filter(pl.col("lii_value").is_not_null())
+        pre_war = float(
+            valid.filter((pl.col("year") >= 1860) & (pl.col("year") <= 1895))
+            ["lii_value"].mean()
+        )
+        war_era = float(
+            valid.filter((pl.col("year") >= 1914) & (pl.col("year") <= 1945))
+            ["lii_value"].mean()
+        )
+        assert war_era > pre_war, (
+            f"War era LII mean ({war_era:.3f}) ≤ pre-war mean ({pre_war:.3f})"
+        )
+
+    def test_late_modern_era_highest(self, lii):
+        """Mean LII 1970–2008 should far exceed mean LII 1860–1895.
+
+        The PC/internet era drives massive vocabulary co-movement.
+        Verified values: 1970–2008 mean ≈ 66.8, 1860–1895 mean ≈ 4.3.
+        """
+        valid = lii.filter(pl.col("lii_value").is_not_null())
+        pre_war = float(
+            valid.filter((pl.col("year") >= 1860) & (pl.col("year") <= 1895))
+            ["lii_value"].mean()
+        )
+        modern = float(
+            valid.filter((pl.col("year") >= 1970) & (pl.col("year") <= 2008))
+            ["lii_value"].mean()
+        )
+        assert modern > pre_war * 5, (
+            f"Late modern LII mean ({modern:.3f}) is not >> pre-war mean ({pre_war:.3f})"
         )
