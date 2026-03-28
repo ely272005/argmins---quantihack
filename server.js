@@ -66,5 +66,8 @@ app.get('/ngrams', async (req, res) => {
 
 app.get('/health', (_, res) => res.json({ ok: true }));
 
+// ── Serve frontend ────────────────────────────────────────────
+app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'index.html')));
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`proxy running on ${PORT}`));

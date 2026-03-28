@@ -42,7 +42,7 @@ INDEX_HTML           = "index.html"
 SERVER_JS            = "server.js"
 
 YEAR_MIN = 1800
-YEAR_MAX = 2019
+YEAR_MAX = 2008
 MIN_YEARS_PRESENT = 20
 MIN_TOTAL_COUNT   = 1000
 

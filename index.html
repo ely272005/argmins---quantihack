@@ -1296,7 +1296,7 @@ const MAP_REGIME_COLORS = {
   adoption:  'rgba(168,200,160,0.75)',
   decline:   'rgba(200,120,120,0.75)',
   turbulent: 'rgba(255,183,77,0.75)',
-  stable:    'rgba(143,168,200,0.55)',
+  stable:    'rgba(143,168,200,0.35)',
 };
 
 async function loadWordMap() {
@@ -1318,12 +1318,13 @@ function renderWordMap(data) {
     byRegime[r].push({ x: row.f1, y: row.f2, word: row.word, peak: row.peak, ncp: row.ncp });
   }
 
-  const datasets = Object.entries(byRegime).map(([regime, pts]) => ({
+  const order = ['stable', 'adoption', 'decline', 'turbulent'];
+  const datasets = order.map(regime => ({
     label: regime,
-    data: pts,
+    data: byRegime[regime],
     backgroundColor: MAP_REGIME_COLORS[regime],
-    pointRadius: 4,
-    pointHoverRadius: 7,
+    pointRadius: 2,
+    pointHoverRadius: 5,
   }));
 
   if (wordMapChartInstance) wordMapChartInstance.destroy();
