@@ -439,6 +439,7 @@
     <button class="tab-btn" id="tab-dashboard" onclick="showTab('dashboard')">instability dashboard</button>
     <button class="tab-btn" id="tab-factors" onclick="showTab('factors')">factor explorer</button>
     <button class="tab-btn" id="tab-wordmap" onclick="showTab('wordmap')">word map</button>
+    <button class="tab-btn" id="tab-emerging" onclick="showTab('emerging')">emerging words</button>
   </nav>
 
   <!-- ── Word Explorer section ───────────────────────── -->
@@ -579,6 +580,57 @@
 
   </div><!-- end section-wordmap -->
 
+  <!-- ── Emerging Words section ───────────────────────── -->
+  <div class="tab-section" id="section-emerging">
+
+    <div class="section-title">Emerging Word Predictor</div>
+    <p style="color:#7a7875;font-family:'DM Mono';font-size:12px;margin:0 0 16px;">
+      Using dynamics visible up to year <strong id="emergingYearLabel">1995</strong>,
+      the model predicts which words are about to surge over the next 5 years.
+      Slide to any year and reveal what actually happened.
+    </p>
+
+    <div id="emergingLoading" class="loading-msg">
+      <span class="loading-dot">●</span> loading predictions…
+    </div>
+
+    <div id="emergingContent" style="display:none;">
+
+      <!-- Model stats -->
+      <div class="dashboard-grid" id="emergingStats"></div>
+
+      <!-- Year slider -->
+      <div style="margin:20px 0;display:flex;align-items:center;gap:12px;">
+        <label style="color:#7a7875;font-family:'DM Mono';font-size:11px;">year</label>
+        <input type="range" id="emergingSlider" min="1900" max="2003" value="1995"
+               style="flex:1;accent-color:#c8b89a;" oninput="onEmergingYear(this.value)">
+        <span id="emergingYearBadge" style="color:#f0ede8;font-family:'DM Mono';font-size:14px;min-width:40px;">1995</span>
+      </div>
+
+      <!-- Prediction table -->
+      <div style="overflow-x:auto;">
+        <table class="event-table" id="emergingTable">
+          <thead>
+            <tr>
+              <th>#</th><th>word</th><th>P(breakout)</th><th>regime</th>
+              <th>actual growth</th><th>result</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Feature importances chart -->
+      <div style="margin-top:24px;">
+        <div class="section-title" style="font-size:14px;">Top Feature Importances</div>
+        <div class="chart-wrap" style="max-width:600px;">
+          <canvas id="featureChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div><!-- end section-emerging -->
+
 </main>
 
 <script>
@@ -591,6 +643,7 @@ function showTab(name) {
   if (name === 'dashboard' && !dashLoaded) loadDashboard();
   if (name === 'factors'   && !factorsLoaded) loadFactors();
   if (name === 'wordmap'   && !wordmapLoaded) loadWordMap();
+  if (name === 'emerging'  && !emergingLoaded) loadEmerging();
 }
 
 // ── Main constants ─────────────────────────────────────────────
@@ -1387,6 +1440,134 @@ function renderWordMap(data) {
         const el  = elements[0];
         const pt  = wordMapChartInstance.data.datasets[el.datasetIndex].data[el.index];
         jumpToWord(pt.word);
+      }
+    }
+  });
+}
+
+// ── Emerging Words Predictor ──────────────────────────────────────
+let emergingLoaded = false, emergingData = null, featureChartInstance = null;
+
+async function loadEmerging() {
+  try {
+    const data = await fetch(`${PROXY}/api/predictions`).then(r => r.json());
+    emergingData = data;
+    emergingLoaded = true;
+    document.getElementById('emergingLoading').style.display = 'none';
+    document.getElementById('emergingContent').style.display = 'block';
+    renderEmergingStats(data);
+    renderFeatureChart(data.feature_importances);
+    onEmergingYear(document.getElementById('emergingSlider').value);
+  } catch(e) {
+    document.getElementById('emergingLoading').textContent = 'failed to load predictions';
+  }
+}
+
+function renderEmergingStats(data) {
+  document.getElementById('emergingStats').innerHTML = `
+    <div class="dash-card">
+      <div class="dash-label">model</div>
+      <div class="dash-value" style="font-size:16px;">${data.model}</div>
+      <div class="dash-sub">h = ${data.horizon} years</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">test AUC</div>
+      <div class="dash-value">${data.test_auc.toFixed(3)}</div>
+      <div class="dash-sub">ROC area under curve</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">precision@50</div>
+      <div class="dash-value">${data.test_p50 != null ? (data.test_p50 * 100).toFixed(0) + '%' : 'N/A'}</div>
+      <div class="dash-sub">top-50 accuracy</div>
+    </div>
+    <div class="dash-card">
+      <div class="dash-label">year coverage</div>
+      <div class="dash-value">${data.years.length}</div>
+      <div class="dash-sub">${data.years[0]}–${data.years[data.years.length-1]}</div>
+    </div>
+  `;
+}
+
+function onEmergingYear(year) {
+  document.getElementById('emergingYearLabel').textContent = year;
+  document.getElementById('emergingYearBadge').textContent = year;
+
+  const preds = emergingData.predictions[String(year)];
+  const tbody = document.querySelector('#emergingTable tbody');
+
+  if (!preds || preds.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">no predictions for this year</td></tr>';
+    return;
+  }
+
+  const REGIME_COLORS = {
+    adoption:  '#a8c8a0', decline: '#c87878',
+    turbulent: '#ffb74d', stable:  '#8fa8c8',
+  };
+
+  tbody.innerHTML = preds.map((w, i) => {
+    const growthStr = w.growth != null ? `${w.growth.toFixed(1)}×` : '—';
+    const growthColor = w.growth != null
+      ? (w.growth >= 2 ? '#a8c8a0' : w.growth >= 1 ? '#7a7875' : '#c87878')
+      : '#7a7875';
+    const resultIcon = w.actual === 1 ? '&#10003;' : '&#10007;';
+    const resultColor = w.actual === 1 ? '#a8c8a0' : '#c87878';
+    const regimeColor = REGIME_COLORS[w.regime] || '#7a7875';
+
+    return `<tr style="cursor:pointer;" onclick="jumpToWord('${w.word}')">
+      <td>${i + 1}</td>
+      <td style="font-weight:600;">${w.word}</td>
+      <td><span style="background:rgba(200,184,154,${w.prob * 0.7});padding:2px 8px;border-radius:4px;">${(w.prob * 100).toFixed(1)}%</span></td>
+      <td><span style="color:${regimeColor};">${w.regime}</span></td>
+      <td style="color:${growthColor};font-weight:600;">${growthStr}</td>
+      <td style="color:${resultColor};font-size:16px;">${resultIcon}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFeatureChart(importances) {
+  const labels = Object.keys(importances);
+  const values = Object.values(importances);
+
+  if (featureChartInstance) featureChartInstance.destroy();
+  const canvas = document.getElementById('featureChart');
+  featureChartInstance = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: 'rgba(200,184,154,0.6)',
+        borderColor: '#c8b89a',
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e21',
+          titleColor: '#f0ede8',
+          bodyColor: '#7a7875',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 10 },
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'importance', color: '#7a7875',
+                   font: { family: 'DM Mono', size: 10 } },
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        },
+        y: {
+          ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 9 } },
+          grid: { display: false },
+          border: { color: 'rgba(255,255,255,0.07)' }
+        }
       }
     }
   });

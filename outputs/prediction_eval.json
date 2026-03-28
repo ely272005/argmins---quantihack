@@ -1,0 +1,660 @@
+{
+  "model": "RandomForest",
+  "horizon": 5,
+  "test_metrics": {
+    "auc": 0.8007,
+    "precision": 0.2833,
+    "recall": 0.5328,
+    "p@50": 0.76,
+    "p@100": 0.75,
+    "p@200": 0.71,
+    "p@500": 0.712
+  },
+  "baselines": {
+    "latent_level": {
+      "auc": 0.2814,
+      "precision": 0.0,
+      "recall": 0.0,
+      "p@50": 0.0,
+      "p@100": 0.0,
+      "p@200": 0.0,
+      "p@500": 0.0
+    },
+    "recent_growth": {
+      "auc": 0.3161,
+      "precision": 0.0824,
+      "recall": 0.1476,
+      "p@50": 0.18,
+      "p@100": 0.18,
+      "p@200": 0.135,
+      "p@500": 0.134
+    },
+    "latent_drift": {
+      "auc": 0.539,
+      "precision": 0.9451,
+      "recall": 0.0009,
+      "p@50": 1.0,
+      "p@100": 0.95,
+      "p@200": 0.925,
+      "p@500": 0.848
+    }
+  },
+  "feature_importances": {
+    "recent_log_change": 0.456494,
+    "local_instability": 0.278595,
+    "latent_level": 0.127276,
+    "regime_turbulent": 0.035436,
+    "latent_drift": 0.031056,
+    "years_since_first": 0.013967,
+    "curvature": 0.011861,
+    "factor_2": 0.007878,
+    "factor_1": 0.007747,
+    "factor_5": 0.004839,
+    "regime_adoption": 0.004214,
+    "factor_3": 0.004005,
+    "recent_changepoints": 0.003093,
+    "factor_4": 0.002866,
+    "regime_decline": 0.002045,
+    "factor_8": 0.001969,
+    "factor_7": 0.001898,
+    "factor_6": 0.00177,
+    "factor_9": 0.001497,
+    "factor_10": 0.001492
+  },
+  "per_year_metrics": {
+    "1996": {
+      "p@50": 0.72,
+      "n_words": 69254
+    },
+    "1997": {
+      "p@50": 0.76,
+      "n_words": 69313
+    },
+    "1998": {
+      "p@50": 0.66,
+      "n_words": 69399
+    },
+    "1999": {
+      "p@50": 0.76,
+      "n_words": 69474
+    },
+    "2000": {
+      "p@50": 0.82,
+      "n_words": 69460
+    },
+    "2001": {
+      "p@50": 0.68,
+      "n_words": 69612
+    },
+    "2002": {
+      "p@50": 0.72,
+      "n_words": 69589
+    },
+    "2003": {
+      "p@50": 0.52,
+      "n_words": 69659
+    }
+  },
+  "word_inspections": {
+    "computer": {
+      "year": 2003,
+      "breakout_prob": 0.0126,
+      "actual_label": 0,
+      "growth_ratio": 0.5338,
+      "classification": "TN"
+    },
+    "technology": {
+      "year": 2003,
+      "breakout_prob": 0.035,
+      "actual_label": 0,
+      "growth_ratio": 0.6884,
+      "classification": "TN"
+    },
+    "wireless": {
+      "year": 2003,
+      "breakout_prob": 0.0548,
+      "actual_label": 0,
+      "growth_ratio": 0.5988,
+      "classification": "TN"
+    },
+    "television": {
+      "year": 2003,
+      "breakout_prob": 0.0152,
+      "actual_label": 0,
+      "growth_ratio": 0.6549,
+      "classification": "TN"
+    },
+    "communism": {
+      "year": 2003,
+      "breakout_prob": 0.0085,
+      "actual_label": 0,
+      "growth_ratio": 0.6981,
+      "classification": "TN"
+    },
+    "capitalism": {
+      "year": 2003,
+      "breakout_prob": 0.0094,
+      "actual_label": 0,
+      "growth_ratio": 0.7173,
+      "classification": "TN"
+    },
+    "cybersex": {
+      "year": 2003,
+      "breakout_prob": 0.3382,
+      "actual_label": 0,
+      "growth_ratio": 0.4848,
+      "classification": "TN"
+    },
+    "transgenic": {
+      "year": 2003,
+      "breakout_prob": 0.1636,
+      "actual_label": 0,
+      "growth_ratio": 0.6109,
+      "classification": "TN"
+    },
+    "telecare": {
+      "year": 2003,
+      "breakout_prob": 0.5936,
+      "actual_label": 0,
+      "growth_ratio": 0.2427,
+      "classification": "FP"
+    },
+    "cdrom": {
+      "year": 2003,
+      "breakout_prob": 0.4789,
+      "actual_label": 0,
+      "growth_ratio": 0.2762,
+      "classification": "TN"
+    }
+  },
+  "demo_predictions": {
+    "1996": [
+      {
+        "word": "wysiwyg",
+        "breakout_prob": 0.9642,
+        "actual_label": 1,
+        "growth_ratio": 11.75
+      },
+      {
+        "word": "codepoints",
+        "breakout_prob": 0.9442,
+        "actual_label": 1,
+        "growth_ratio": 16.57
+      },
+      {
+        "word": "cryptochrome",
+        "breakout_prob": 0.9441,
+        "actual_label": 1,
+        "growth_ratio": 9.25
+      },
+      {
+        "word": "casomorphin",
+        "breakout_prob": 0.9409,
+        "actual_label": 1,
+        "growth_ratio": 2.62
+      },
+      {
+        "word": "careseeker",
+        "breakout_prob": 0.9375,
+        "actual_label": 1,
+        "growth_ratio": 35.44
+      },
+      {
+        "word": "transdifferentiation",
+        "breakout_prob": 0.9371,
+        "actual_label": 0,
+        "growth_ratio": 0.9
+      },
+      {
+        "word": "compactified",
+        "breakout_prob": 0.9333,
+        "actual_label": 1,
+        "growth_ratio": 9.36
+      },
+      {
+        "word": "codepage",
+        "breakout_prob": 0.9306,
+        "actual_label": 1,
+        "growth_ratio": 4.79
+      },
+      {
+        "word": "whitelist",
+        "breakout_prob": 0.9304,
+        "actual_label": 1,
+        "growth_ratio": 4.24
+      },
+      {
+        "word": "wgbh",
+        "breakout_prob": 0.9293,
+        "actual_label": 1,
+        "growth_ratio": 104.79
+      },
+      {
+        "word": "catotelm",
+        "breakout_prob": 0.9289,
+        "actual_label": 1,
+        "growth_ratio": 2.75
+      },
+      {
+        "word": "carfentanil",
+        "breakout_prob": 0.921,
+        "actual_label": 0,
+        "growth_ratio": 1.08
+      },
+      {
+        "word": "wordline",
+        "breakout_prob": 0.9208,
+        "actual_label": 1,
+        "growth_ratio": 90.54
+      },
+      {
+        "word": "chondrichthyan",
+        "breakout_prob": 0.9207,
+        "actual_label": 1,
+        "growth_ratio": 20.23
+      },
+      {
+        "word": "takaful",
+        "breakout_prob": 0.9199,
+        "actual_label": 1,
+        "growth_ratio": 13.57
+      },
+      {
+        "word": "tsukunft",
+        "breakout_prob": 0.9197,
+        "actual_label": 1,
+        "growth_ratio": 3.99
+      },
+      {
+        "word": "tiebreak",
+        "breakout_prob": 0.9187,
+        "actual_label": 0,
+        "growth_ratio": 1.54
+      },
+      {
+        "word": "canyoneering",
+        "breakout_prob": 0.9186,
+        "actual_label": 0,
+        "growth_ratio": 1.93
+      },
+      {
+        "word": "commlink",
+        "breakout_prob": 0.917,
+        "actual_label": 1,
+        "growth_ratio": 16.84
+      },
+      {
+        "word": "clrscr",
+        "breakout_prob": 0.917,
+        "actual_label": 0,
+        "growth_ratio": 1.05
+      }
+    ],
+    "1998": [
+      {
+        "word": "wysiwyg",
+        "breakout_prob": 0.9585,
+        "actual_label": 1,
+        "growth_ratio": 32.98
+      },
+      {
+        "word": "cyromazine",
+        "breakout_prob": 0.9468,
+        "actual_label": 0,
+        "growth_ratio": 0.69
+      },
+      {
+        "word": "cprintf",
+        "breakout_prob": 0.9288,
+        "actual_label": 0,
+        "growth_ratio": 0.44
+      },
+      {
+        "word": "cyanobionts",
+        "breakout_prob": 0.9285,
+        "actual_label": 1,
+        "growth_ratio": 10.35
+      },
+      {
+        "word": "clrscr",
+        "breakout_prob": 0.9272,
+        "actual_label": 0,
+        "growth_ratio": 0.91
+      },
+      {
+        "word": "tiamulin",
+        "breakout_prob": 0.9271,
+        "actual_label": 1,
+        "growth_ratio": 7.45
+      },
+      {
+        "word": "chalybeates",
+        "breakout_prob": 0.9265,
+        "actual_label": 1,
+        "growth_ratio": 15.87
+      },
+      {
+        "word": "ciclosporin",
+        "breakout_prob": 0.9244,
+        "actual_label": 1,
+        "growth_ratio": 21.07
+      },
+      {
+        "word": "tectofugal",
+        "breakout_prob": 0.9188,
+        "actual_label": 0,
+        "growth_ratio": 1.38
+      },
+      {
+        "word": "consectetuer",
+        "breakout_prob": 0.9187,
+        "actual_label": 0,
+        "growth_ratio": 1.93
+      },
+      {
+        "word": "chaburah",
+        "breakout_prob": 0.9182,
+        "actual_label": 0,
+        "growth_ratio": 1.93
+      },
+      {
+        "word": "trudng",
+        "breakout_prob": 0.9179,
+        "actual_label": 1,
+        "growth_ratio": 13.46
+      },
+      {
+        "word": "creolistics",
+        "breakout_prob": 0.9176,
+        "actual_label": 1,
+        "growth_ratio": 2.42
+      },
+      {
+        "word": "theuseof",
+        "breakout_prob": 0.9156,
+        "actual_label": 1,
+        "growth_ratio": 17.02
+      },
+      {
+        "word": "tumbao",
+        "breakout_prob": 0.9156,
+        "actual_label": 1,
+        "growth_ratio": 14.03
+      },
+      {
+        "word": "chlororaphis",
+        "breakout_prob": 0.9112,
+        "actual_label": 1,
+        "growth_ratio": 4.05
+      },
+      {
+        "word": "campingground",
+        "breakout_prob": 0.9097,
+        "actual_label": 1,
+        "growth_ratio": 4.6
+      },
+      {
+        "word": "tumorlets",
+        "breakout_prob": 0.9094,
+        "actual_label": 1,
+        "growth_ratio": 8.97
+      },
+      {
+        "word": "catotelm",
+        "breakout_prob": 0.9069,
+        "actual_label": 0,
+        "growth_ratio": 1.06
+      },
+      {
+        "word": "throughcare",
+        "breakout_prob": 0.9061,
+        "actual_label": 0,
+        "growth_ratio": 0.92
+      }
+    ],
+    "2000": [
+      {
+        "word": "clrscr",
+        "breakout_prob": 0.9415,
+        "actual_label": 1,
+        "growth_ratio": 5.87
+      },
+      {
+        "word": "clofibric",
+        "breakout_prob": 0.9302,
+        "actual_label": 1,
+        "growth_ratio": 3.06
+      },
+      {
+        "word": "careseeker",
+        "breakout_prob": 0.9283,
+        "actual_label": 1,
+        "growth_ratio": 20.82
+      },
+      {
+        "word": "charaoter",
+        "breakout_prob": 0.9271,
+        "actual_label": 1,
+        "growth_ratio": 3.75
+      },
+      {
+        "word": "cpusa",
+        "breakout_prob": 0.9247,
+        "actual_label": 1,
+        "growth_ratio": 2.04
+      },
+      {
+        "word": "tongxianghui",
+        "breakout_prob": 0.9229,
+        "actual_label": 0,
+        "growth_ratio": 1.45
+      },
+      {
+        "word": "claimsmakers",
+        "breakout_prob": 0.9229,
+        "actual_label": 0,
+        "growth_ratio": 1.05
+      },
+      {
+        "word": "complementarians",
+        "breakout_prob": 0.9226,
+        "actual_label": 1,
+        "growth_ratio": 2.99
+      },
+      {
+        "word": "capoeirista",
+        "breakout_prob": 0.9219,
+        "actual_label": 1,
+        "growth_ratio": 32.97
+      },
+      {
+        "word": "teaspoonf",
+        "breakout_prob": 0.9207,
+        "actual_label": 1,
+        "growth_ratio": 7.31
+      },
+      {
+        "word": "cimeters",
+        "breakout_prob": 0.9206,
+        "actual_label": 1,
+        "growth_ratio": 16.29
+      },
+      {
+        "word": "capoeiristas",
+        "breakout_prob": 0.9199,
+        "actual_label": 1,
+        "growth_ratio": 57.55
+      },
+      {
+        "word": "clubmobile",
+        "breakout_prob": 0.9197,
+        "actual_label": 1,
+        "growth_ratio": 4.81
+      },
+      {
+        "word": "catotelm",
+        "breakout_prob": 0.9194,
+        "actual_label": 1,
+        "growth_ratio": 3.15
+      },
+      {
+        "word": "cardiometabolic",
+        "breakout_prob": 0.9138,
+        "actual_label": 1,
+        "growth_ratio": 40.34
+      },
+      {
+        "word": "cucurbitacin",
+        "breakout_prob": 0.9121,
+        "actual_label": 1,
+        "growth_ratio": 10.45
+      },
+      {
+        "word": "comonotonic",
+        "breakout_prob": 0.9102,
+        "actual_label": 1,
+        "growth_ratio": 89.22
+      },
+      {
+        "word": "converb",
+        "breakout_prob": 0.9095,
+        "actual_label": 1,
+        "growth_ratio": 2.85
+      },
+      {
+        "word": "calponin",
+        "breakout_prob": 0.909,
+        "actual_label": 1,
+        "growth_ratio": 3.07
+      },
+      {
+        "word": "chlorids",
+        "breakout_prob": 0.9084,
+        "actual_label": 1,
+        "growth_ratio": 3.1
+      }
+    ],
+    "2003": [
+      {
+        "word": "cdev",
+        "breakout_prob": 0.9557,
+        "actual_label": 1,
+        "growth_ratio": 13.88
+      },
+      {
+        "word": "tongjiju",
+        "breakout_prob": 0.938,
+        "actual_label": 1,
+        "growth_ratio": 3.78
+      },
+      {
+        "word": "tsukunft",
+        "breakout_prob": 0.9343,
+        "actual_label": 0,
+        "growth_ratio": 1.66
+      },
+      {
+        "word": "typeahead",
+        "breakout_prob": 0.932,
+        "actual_label": 0,
+        "growth_ratio": 0.74
+      },
+      {
+        "word": "condenseries",
+        "breakout_prob": 0.9292,
+        "actual_label": 1,
+        "growth_ratio": 8.86
+      },
+      {
+        "word": "carburetters",
+        "breakout_prob": 0.9284,
+        "actual_label": 1,
+        "growth_ratio": 3.25
+      },
+      {
+        "word": "cogenerative",
+        "breakout_prob": 0.9256,
+        "actual_label": 1,
+        "growth_ratio": 38.99
+      },
+      {
+        "word": "tubularized",
+        "breakout_prob": 0.9172,
+        "actual_label": 1,
+        "growth_ratio": 5.31
+      },
+      {
+        "word": "condensery",
+        "breakout_prob": 0.9164,
+        "actual_label": 1,
+        "growth_ratio": 6.17
+      },
+      {
+        "word": "clitoroplasty",
+        "breakout_prob": 0.9162,
+        "actual_label": 1,
+        "growth_ratio": 4.31
+      },
+      {
+        "word": "capitolunate",
+        "breakout_prob": 0.9139,
+        "actual_label": 0,
+        "growth_ratio": 1.49
+      },
+      {
+        "word": "weqatal",
+        "breakout_prob": 0.9136,
+        "actual_label": 0,
+        "growth_ratio": 1.52
+      },
+      {
+        "word": "tongxianghui",
+        "breakout_prob": 0.9132,
+        "actual_label": 0,
+        "growth_ratio": 1.18
+      },
+      {
+        "word": "cystatin",
+        "breakout_prob": 0.9126,
+        "actual_label": 0,
+        "growth_ratio": 2.47
+      },
+      {
+        "word": "taxonic",
+        "breakout_prob": 0.9119,
+        "actual_label": 1,
+        "growth_ratio": 4.66
+      },
+      {
+        "word": "tarbiya",
+        "breakout_prob": 0.911,
+        "actual_label": 0,
+        "growth_ratio": 1.37
+      },
+      {
+        "word": "teroxide",
+        "breakout_prob": 0.911,
+        "actual_label": 1,
+        "growth_ratio": 34.52
+      },
+      {
+        "word": "careseeker",
+        "breakout_prob": 0.9104,
+        "actual_label": 0,
+        "growth_ratio": 1.63
+      },
+      {
+        "word": "writeset",
+        "breakout_prob": 0.9096,
+        "actual_label": 1,
+        "growth_ratio": 13.12
+      },
+      {
+        "word": "curdlan",
+        "breakout_prob": 0.9086,
+        "actual_label": 0,
+        "growth_ratio": 0.78
+      }
+    ]
+  }
+}
