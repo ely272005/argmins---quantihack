@@ -1,0 +1,74 @@
+[
+  {
+    "name": "Napoleonic Wars",
+    "start_year": 1803,
+    "end_year": 1815,
+    "category": "conflict"
+  },
+  {
+    "name": "Cholera Epidemics",
+    "start_year": 1817,
+    "end_year": 1866,
+    "category": "health"
+  },
+  {
+    "name": "Revolutions of 1848",
+    "start_year": 1848,
+    "end_year": 1851,
+    "category": "political"
+  },
+  {
+    "name": "US Civil War",
+    "start_year": 1861,
+    "end_year": 1865,
+    "category": "conflict"
+  },
+  {
+    "name": "Great Influenza 1889",
+    "start_year": 1889,
+    "end_year": 1895,
+    "category": "health"
+  },
+  {
+    "name": "WWI",
+    "start_year": 1914,
+    "end_year": 1918,
+    "category": "conflict"
+  },
+  {
+    "name": "Spanish Flu",
+    "start_year": 1918,
+    "end_year": 1920,
+    "category": "health"
+  },
+  {
+    "name": "Great Depression",
+    "start_year": 1929,
+    "end_year": 1939,
+    "category": "economic"
+  },
+  {
+    "name": "WWII",
+    "start_year": 1939,
+    "end_year": 1945,
+    "category": "conflict"
+  },
+  {
+    "name": "Cold War",
+    "start_year": 1947,
+    "end_year": 1991,
+    "category": "political"
+  },
+  {
+    "name": "Vietnam War",
+    "start_year": 1955,
+    "end_year": 1975,
+    "category": "conflict"
+  },
+  {
+    "name": "Computing Revolution",
+    "start_year": 1970,
+    "end_year": 2008,
+    "category": "technology"
+  }
+]
