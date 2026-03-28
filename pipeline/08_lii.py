@@ -53,7 +53,7 @@ LII_PATH          = os.path.join(PROCESSED_DIR, "language_instability_index.parq
 PLOT_PATH         = os.path.join(OUTPUTS_DIR,   "phase8_lii.png")
 
 YEAR_MIN        = 1800
-YEAR_MAX        = 2008
+YEAR_MAX = 2019
 ALL_YEARS       = list(range(YEAR_MIN, YEAR_MAX + 1))  # 209 years
 DEFAULT_WINDOW  = 20    # rolling window for Σ_t estimation
 MIN_PERIODS     = 5     # minimum observations before LII is defined

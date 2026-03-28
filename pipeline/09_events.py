@@ -69,7 +69,7 @@ ALIGNMENT_JSON = os.path.join(PROCESSED_DIR, "event_alignment.json")
 PLOT_PATH      = os.path.join(OUTPUTS_DIR,   "phase9_event_alignment.png")
 
 YEAR_MIN = 1800
-YEAR_MAX = 2008
+YEAR_MAX = 2019
 N_FACTORS = 10
 
 VALID_CATEGORIES = {"conflict", "health", "political", "economic", "technology"}

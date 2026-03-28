@@ -1,14 +1,18 @@
 {
-  "generated_at": "2026-03-28T15:47:03.241231+00:00",
+  "generated_at": "2026-03-28T16:10:10.454856+00:00",
   "model_quality": {
-    "n_words_total": 60,
-    "n_converged": 59,
-    "n_failed": 1,
-    "convergence_rate": 0.983333,
-    "aic_mean": 63.7371,
-    "aic_median": -62.2961,
+    "n_words_total": 205,
+    "n_converged": 200,
+    "n_failed": 5,
+    "convergence_rate": 0.97561,
+    "aic_mean": 96.5942,
+    "aic_median": -1.2259,
     "failed_words": [
-      "education"
+      "feudalism",
+      "harbor",
+      "judge",
+      "senate",
+      "war"
     ]
   },
   "word_sanity": {
@@ -19,7 +23,7 @@
     },
     "computer": {
       "peak_year": 1987,
-      "n_changepoints": 5,
+      "n_changepoints": 4,
       "dominant_regime": "turbulent"
     },
     "technology": {
@@ -29,11 +33,11 @@
     },
     "typewriter": {
       "peak_year": 1914,
-      "n_changepoints": 4,
-      "dominant_regime": "turbulent"
+      "n_changepoints": 5,
+      "dominant_regime": "adoption"
     },
     "wireless": {
-      "peak_year": 2008,
+      "peak_year": 2005,
       "n_changepoints": 5,
       "dominant_regime": "turbulent"
     }
@@ -42,180 +46,184 @@
     "top_cp_years": [
       1869,
       1859,
-      1914,
-      1894,
+      2004,
+      1959,
+      1929,
+      1904,
       1954,
-      1974,
-      1879,
-      1884,
-      1899,
-      1929
+      1829,
+      1839,
+      1939
     ],
     "cp_density_peak_year": 1869,
-    "near_event_rate": 0.7
+    "near_event_rate": 0.5
   },
   "factor_interpretability": {
     "factor_1": {
       "top_words": [
-        "poverty",
-        "biology",
         "parliament",
-        "marriage",
-        "communism",
-        "physics",
-        "religion",
+        "nitrogen",
+        "cattle",
+        "coal",
+        "republic",
+        "socialism",
+        "library",
+        "revolution",
         "peace",
-        "trade",
-        "chemistry"
+        "poverty"
       ],
-      "explained_variance": 0.535712
+      "explained_variance": 0.55353
     },
     "factor_2": {
       "top_words": [
-        "surgery",
-        "aircraft",
+        "conservation",
         "disease",
-        "soldier",
-        "science",
-        "capitalism",
-        "radio",
-        "nuclear",
-        "automobile",
-        "cinema"
+        "slavery",
+        "abolition",
+        "aircraft",
+        "airplane",
+        "patriotism",
+        "constitution",
+        "horse",
+        "genetics"
       ],
-      "explained_variance": 0.246393
+      "explained_variance": 0.242956
     },
     "factor_3": {
       "top_words": [
         "economy",
         "satellite",
-        "election",
+        "bridge",
+        "road",
+        "population",
         "telegraph",
-        "industry",
-        "philosophy",
-        "wireless",
-        "education",
-        "photography",
-        "factory"
+        "infection",
+        "factory",
+        "bacteria",
+        "transistor"
       ],
-      "explained_variance": 0.109143
+      "explained_variance": 0.085023
     },
     "factor_4": {
       "top_words": [
-        "computer",
+        "guerrilla",
+        "president",
         "photography",
-        "wireless",
-        "war",
-        "industry",
-        "cinema",
-        "automobile",
-        "telegraph",
-        "nuclear",
-        "satellite"
+        "rationalism",
+        "conservatism",
+        "digital",
+        "plastic",
+        "senate",
+        "congress",
+        "organism"
       ],
-      "explained_variance": 0.055387
+      "explained_variance": 0.052227
     },
     "factor_5": {
       "top_words": [
-        "telegraph",
-        "war",
-        "radio",
-        "telephone",
-        "photography",
-        "society",
-        "computer",
+        "fascism",
         "cinema",
-        "wireless",
-        "terror"
+        "radio",
+        "digital",
+        "bacteria",
+        "computer",
+        "freedom",
+        "rationalism",
+        "telephone",
+        "organism"
       ],
-      "explained_variance": 0.027555
+      "explained_variance": 0.023317
     },
     "factor_6": {
       "top_words": [
+        "feminist",
+        "secularism",
+        "antibiotic",
         "television",
-        "telephone",
-        "cinema",
-        "society",
+        "plastic",
+        "iron",
+        "president",
         "philosophy",
-        "capitalism",
-        "internet",
-        "war",
-        "crisis",
-        "terror"
+        "collectivism",
+        "bacteria"
       ],
-      "explained_variance": 0.008439
+      "explained_variance": 0.017419
     },
     "factor_7": {
       "top_words": [
+        "canal",
+        "rationalism",
         "factory",
+        "organism",
+        "anarchism",
         "computer",
-        "society",
-        "economy",
-        "terror",
-        "cinema",
-        "radio",
-        "weapon",
-        "wireless",
-        "nuclear"
+        "pollution",
+        "railroad",
+        "digital",
+        "secularism"
       ],
-      "explained_variance": 0.005486
+      "explained_variance": 0.008982
     },
     "factor_8": {
       "top_words": [
-        "society",
-        "telegraph",
-        "wireless",
-        "terror",
-        "computer",
+        "fascism",
+        "rationalism",
         "television",
-        "automobile",
-        "war",
-        "justice",
-        "photography"
+        "transistor",
+        "iron",
+        "telegraph",
+        "congress",
+        "ship",
+        "telephone",
+        "wireless"
       ],
-      "explained_variance": 0.005132
+      "explained_variance": 0.004733
     },
     "factor_9": {
       "top_words": [
-        "cinema",
-        "wireless",
         "society",
-        "war",
-        "telephone",
-        "justice",
-        "satellite",
-        "education",
-        "economy",
-        "terror"
+        "conservatism",
+        "fascism",
+        "president",
+        "canal",
+        "photography",
+        "anarchism",
+        "ship",
+        "factory",
+        "rationalism"
       ],
-      "explained_variance": 0.002914
+      "explained_variance": 0.003591
     },
     "factor_10": {
       "top_words": [
-        "election",
-        "photography",
-        "capitalism",
-        "disease",
-        "economy",
-        "education",
-        "satellite",
+        "conservatism",
+        "canal",
+        "plastic",
+        "senate",
+        "cinema",
+        "urbanization",
+        "wireless",
         "theory",
-        "philosophy",
-        "empire"
+        "satellite",
+        "congress"
       ],
-      "explained_variance": 0.001484
+      "explained_variance": 0.002773
     }
   },
   "lii_sanity": {
-    "peak_year": 1807,
-    "peak_value": 0.0411,
-    "min_value": 0.0039,
-    "max_value": 0.0411,
-    "cp_lii_correlation": -0.031644
+    "peak_year": 1833,
+    "peak_value": 0.2043,
+    "min_value": 0.0111,
+    "max_value": 0.2043,
+    "cp_lii_correlation": 0.016558
   },
   "failures": {
-    "n_failed_fits": 1,
-    "extreme_drift_words": [],
-    "high_instability_words": []
+    "n_failed_fits": 5,
+    "extreme_drift_words": [
+      "software"
+    ],
+    "high_instability_words": [
+      "television"
+    ]
   }
 }

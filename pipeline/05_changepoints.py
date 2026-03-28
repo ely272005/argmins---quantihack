@@ -35,7 +35,7 @@ DENSITY_PATH      = os.path.join(PROCESSED_DIR, "changepoint_density.parquet")
 PLOT_PATH         = os.path.join(OUTPUTS_DIR,   "phase5_sanity_check.png")
 
 YEAR_MIN    = 1800
-YEAR_MAX    = 2008
+YEAR_MAX = 2019
 DEFAULT_PEN = 3        # PELT penalty — lower = more sensitive
 SIGNAL_COL  = "latent_level"
 

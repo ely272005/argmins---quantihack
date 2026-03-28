@@ -19,29 +19,63 @@ import pyarrow.parquet as pq
 PROCESSED_DIR = "data/processed"
 TOTAL_COUNTS_FILE = "data/raw/googlebooks-eng-all-totalcounts-20120701.txt"
 YEAR_MIN = 1800
-YEAR_MAX = 2008
+YEAR_MAX = 2019
 
 os.makedirs(PROCESSED_DIR, exist_ok=True)
 
 WORDS = [
-    # Technology
+    # ── Technology & innovation ───────────────────────────────
     "computer", "internet", "telephone", "television", "radio",
     "electricity", "automobile", "aircraft", "nuclear", "satellite",
     "wireless", "telegraph", "typewriter", "photography", "cinema",
-    # Conflict / geopolitics
+    "railroad", "engine", "machine", "steel", "printing",
+    "software", "digital", "electronic", "transistor", "laser",
+    "robot", "automation", "plastic", "petroleum", "locomotive",
+    "microscope", "telescope", "vaccine", "antibiotic", "radar",
+    # ── Conflict / geopolitics ────────────────────────────────
     "war", "battle", "revolution", "democracy", "empire",
     "freedom", "nationalism", "capitalism", "communism", "crisis",
     "peace", "army", "weapon", "soldier", "terror",
-    # Science / medicine
-    "pandemic", "disease", "vaccine", "evolution", "theory",
+    "invasion", "treaty", "colony", "independence", "republic",
+    "dictator", "fascism", "rebellion", "militia", "treason",
+    "propaganda", "occupation", "alliance", "sovereignty", "refugee",
+    "genocide", "assassination", "blockade", "ceasefire", "guerrilla",
+    # ── Science / medicine ────────────────────────────────────
+    "pandemic", "disease", "evolution", "theory", "experiment",
     "chemistry", "biology", "physics", "medicine", "surgery",
-    # Society / culture
+    "bacteria", "infection", "hospital", "anatomy", "diagnosis",
+    "radiation", "oxygen", "hydrogen", "nitrogen", "molecule",
+    "genetics", "chromosome", "protein", "cell", "organism",
+    "earthquake", "volcano", "climate", "fossil", "mineral",
+    # ── Society / culture ─────────────────────────────────────
     "education", "religion", "marriage", "poverty", "trade",
     "labour", "industry", "factory", "newspaper", "literature",
     "science", "philosophy", "culture", "society", "economy",
-    # Common dynamics words
+    "church", "university", "library", "school", "museum",
+    "slavery", "abolition", "suffrage", "feminist", "equality",
+    "immigration", "urbanization", "transportation", "communication", "population",
+    "wealth", "taxation", "inflation", "unemployment", "recession",
+    # ── Governance / law ──────────────────────────────────────
     "king", "government", "parliament", "election", "justice",
+    "constitution", "legislation", "court", "judge", "prison",
+    "police", "crime", "corruption", "reform", "bureaucracy",
+    "president", "congress", "senate", "monarchy", "aristocracy",
+    # ── Everyday life / material culture ──────────────────────
+    "food", "water", "cotton", "sugar", "tobacco",
+    "coal", "iron", "gold", "silver", "copper",
+    "ship", "bridge", "road", "canal", "harbor",
+    "farm", "wheat", "cattle", "horse", "wool",
+    # ── Ideas / ideology ──────────────────────────────────────
+    "liberty", "socialism", "liberalism", "conservatism", "anarchism",
+    "imperialism", "colonialism", "feudalism", "secularism", "materialism",
+    "patriotism", "individualism", "collectivism", "romanticism", "rationalism",
+    # ── Modern / 20th century ─────────────────────────────────
+    "airplane", "tank", "submarine", "missile", "helicopter",
+    "energy", "pollution", "environment", "conservation", "sustainability",
+    "globalization", "terrorism", "cybersecurity", "biotechnology", "nanotechnology",
 ]
+# Deduplicate while preserving order
+WORDS = list(dict.fromkeys(WORDS))
 
 # ── Load total counts ─────────────────────────────────────────
 def load_total_counts():
@@ -63,6 +97,14 @@ def load_total_counts():
         if YEAR_MIN <= year <= YEAR_MAX:
             totals[year] = match_count
     print(f"Total counts: {len(totals)} years ({min(totals)}–{max(totals)})")
+    # Extrapolate for years beyond the file (2009-2019) using last known value
+    if totals:
+        last_known_year = max(totals)
+        last_known_val = totals[last_known_year]
+        for yr in range(last_known_year + 1, YEAR_MAX + 1):
+            if yr not in totals:
+                totals[yr] = last_known_val
+        print(f"  Extrapolated to {max(totals)} ({len(totals)} years total)")
     return totals
 
 # ── Fetch one word from Google Ngrams API ─────────────────────

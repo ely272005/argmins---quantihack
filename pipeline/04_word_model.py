@@ -36,7 +36,7 @@ WORD_SUMMARY_PATH = os.path.join(PROCESSED_DIR, "word_summary_metrics.parquet")
 FAILED_LOG_PATH   = os.path.join(OUTPUTS_DIR,   "phase4_failed_words.log")
 
 YEAR_MIN = 1800
-YEAR_MAX = 2008
+YEAR_MAX = 2019
 ALL_YEARS = np.arange(YEAR_MIN, YEAR_MAX + 1, dtype=int)   # 209 years
 
 INSTABILITY_WINDOW      = 20

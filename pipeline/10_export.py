@@ -66,7 +66,7 @@ N_WORDS   = 500    # per-word JSON files to generate (top by mean_instability)
 N_MAP     = 500    # words for 2D factor scatter map (top by Euclidean factor distance)
 N_FACTORS = 10
 YEAR_MIN  = 1800
-YEAR_MAX  = 2008
+YEAR_MAX = 2019
 
 # Anchor words always included in per-word export regardless of ranking
 ANCHOR_WORDS = {"war", "computer", "technology", "wireless", "television",
@@ -95,11 +95,13 @@ def export_lii(lii_path: str, out_path: str) -> int:
             pl.col("lii_fallback").alias("fallback"),
         ])
     )
+    # Scale LII by 10,000 for readability (raw trace values are ~0.01–0.05)
+    LII_SCALE = 10000
     records = []
     for row in df.iter_rows(named=True):
         records.append({
             "year":    int(row["year"]),
-            "lii":     float(row["lii"])     if row["lii"]     is not None else None,
+            "lii":     round(float(row["lii"]) * LII_SCALE, 2) if row["lii"]     is not None else None,
             "cr":      float(row["cr"])      if row["cr"]      is not None else None,
             "bvn":     float(row["bvn"])     if row["bvn"]     is not None else None,
             "fallback":float(row["fallback"])if row["fallback"]is not None else None,

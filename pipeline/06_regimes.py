@@ -42,7 +42,7 @@ REGIMES_PATH      = os.path.join(PROCESSED_DIR, "regimes.parquet")
 PLOT_PATH         = os.path.join(OUTPUTS_DIR,   "phase6_sanity_check.png")
 
 YEAR_MIN          = 1800
-YEAR_MAX          = 2008
+YEAR_MAX = 2019
 THRESHOLD         = 1.0          # one robust sigma; configurable via --threshold
 PROXIMITY_WINDOW  = 3            # ±years around a changepoint for the near_cp flag
 MAD_SCALE         = 1.4826       # converts MAD to σ-equivalent (consistency factor)

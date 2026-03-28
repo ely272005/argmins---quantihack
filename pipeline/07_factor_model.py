@@ -51,7 +51,7 @@ METADATA_PATH         = os.path.join(PROCESSED_DIR, "factor_metadata.json")
 PLOT_PATH             = os.path.join(OUTPUTS_DIR,   "phase7_sanity_check.png")
 
 YEAR_MIN           = 1800
-YEAR_MAX           = 2008
+YEAR_MAX = 2019
 SIGNAL_COL         = "latent_drift"
 DEFAULT_N_FACTORS  = 10
 TOP_LOADING_N      = 10    # words per panel in the loading bar chart

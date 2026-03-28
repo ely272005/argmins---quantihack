@@ -60,7 +60,7 @@
     padding-bottom: 3px;
   }
 
-  main { padding: 2rem 3rem; max-width: 1100px; }
+  main { padding: 2rem 3rem; }
 
   .search-row {
     display: flex;
@@ -765,7 +765,7 @@ function renderChart() {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 2.8,
+      aspectRatio: 2.2,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -960,7 +960,7 @@ function renderModelPanel(data) {
     options: {
       responsive: true,
       maintainAspectRatio: true,
-      aspectRatio: 4,
+      aspectRatio: 2.5,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -1036,11 +1036,11 @@ function renderDashStats(liiData, alignData) {
     <div class="dash-card">
       <div class="dash-label">LII peak year</div>
       <div class="dash-value">${maxRow.year}</div>
-      <div class="dash-sub">lii = ${maxRow.lii.toFixed(4)}</div>
+      <div class="dash-sub">lii = ${maxRow.lii.toFixed(1)}</div>
     </div>
     <div class="dash-card">
       <div class="dash-label">most recent LII</div>
-      <div class="dash-value">${lastRow.lii.toFixed(4)}</div>
+      <div class="dash-value">${lastRow.lii.toFixed(1)}</div>
       <div class="dash-sub">${lastRow.year}</div>
     </div>
     <div class="dash-card">
@@ -1154,7 +1154,7 @@ function renderLIIChart(liiData, alignData) {
           grid: { color: 'rgba(255,255,255,0.04)' },
           ticks: { color: '#7a7875', font: { family: 'DM Mono', size: 10 }, maxTicksLimit: 6, callback: v => v.toFixed(0) },
           border: { color: 'rgba(255,255,255,0.07)' },
-          title: { display: true, text: 'LII', color: '#7a7875', font: { family: 'DM Mono', size: 10 } }
+          title: { display: true, text: 'LII (×10⁴)', color: '#7a7875', font: { family: 'DM Mono', size: 10 } }
         },
         yCr: {
           type: 'linear', position: 'right',
@@ -1246,7 +1246,7 @@ function renderFactorChart(n) {
     },
     options: {
       responsive: true,
-      aspectRatio: 3,
+      aspectRatio: 2.2,
       plugins: {
         legend: { display: false },
         tooltip: {

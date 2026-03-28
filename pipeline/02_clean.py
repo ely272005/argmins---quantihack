@@ -10,7 +10,7 @@ PROCESSED_DIR    = "data/processed"
 TOTAL_COUNTS_FILE = "data/raw/googlebooks-eng-all-totalcounts-20120701.txt"
 
 YEAR_MIN = 1800
-YEAR_MAX = 2008  # total counts file only covers up to 2008
+YEAR_MAX = 2019
 
 MIN_YEARS_PRESENT = 20   # word must appear in at least this many distinct years
 MIN_TOTAL_COUNT   = 1000  # word must have at least this many total occurrences
